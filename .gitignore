@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+release/
+data/uploads/
+data/database/*.db
+data/database/*.db-journal
+data/database/*.db-shm
+data/database/*.db-wal

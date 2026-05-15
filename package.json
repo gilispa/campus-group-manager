@@ -1,0 +1,81 @@
+{
+  "name": "base-de-datos-grupos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend local-first para gestion de grupos estudiantiles con Electron, Prisma y SQLite",
+  "main": "dist/electron/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "build": "npm run build:backend && npm run build:renderer",
+    "build:backend": "tsc -p tsconfig.json",
+    "build:renderer": "tsc -p tsconfig.renderer.json && vite build",
+    "dev": "concurrently \"npm:dev:backend\" \"npm:dev:renderer\" \"npm:dev:electron\"",
+    "dev:backend": "tsc -p tsconfig.json --watch",
+    "dev:renderer": "vite",
+    "dev:electron": "node scripts/start-electron-dev.mjs",
+    "start:desktop": "npm run build && npx electron .",
+    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:dir": "npm run build && electron-builder --dir",
+    "examples": "tsx src/main/examples.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.2",
+    "@types/adm-zip": "^0.5.8",
+    "adm-zip": "^0.5.17",
+    "bcrypt": "^5.1.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.4.1",
+    "concurrently": "^9.1.2",
+    "electron": "^35.5.1",
+    "electron-builder": "^24.13.3",
+    "prisma": "^6.8.2",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "wait-on": "^8.0.3"
+  },
+  "build": {
+    "appId": "mx.university.grupos.desktop",
+    "productName": "Gestion Grupos Estudiantiles",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "images/**/*",
+      "node_modules/@prisma/**/*",
+      "node_modules/.prisma/**/*",
+      "prisma/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "dist/electron/main.js"
+    },
+    "win": {
+      "icon": "images/ml-v.png",
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum StudentLevel {
+  PREPA
+  PROFESIONAL
+}
+
+model Student {
+  id             String         @id @default(cuid())
+  nombre         String
+  matricula      String         @unique
+  nivel          StudentLevel
+  careerId       String?
+  prepaProgramId String?
+  generacion     Int
+  foto           String?
+  telefono       String?
+  email          String?
+  notas          String?
+  activo         Boolean        @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  career         Career?        @relation(fields: [careerId], references: [id], onDelete: SetNull)
+  prepaProgram   PrepaProgram?  @relation(fields: [prepaProgramId], references: [id], onDelete: SetNull)
+  memberships    StudentGroup[]
+
+  @@index([nombre])
+  @@index([nivel])
+  @@index([generacion])
+  @@index([careerId])
+  @@index([prepaProgramId])
+  @@index([deletedAt])
+}
+
+model Group {
+  id           String         @id @default(cuid())
+  nombre       String
+  descripcion  String?
+  logo         String?
+  categoryId   String?
+  deletedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  memberships  StudentGroup[]
+
+  @@index([nombre])
+  @@index([categoryId])
+  @@index([deletedAt])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime @default(now())
+  groups      Group[]
+}
+
+model Role {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime       @default(now())
+  memberships StudentGroup[]
+}
+
+model Career {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  students    Student[]
+}
+
+model PrepaProgram {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  students    Student[]
+}
+
+model StudentGroup {
+  id        String   @id @default(cuid())
+  studentId String
+  groupId   String
+  roleId    String?
+  joinedAt  DateTime @default(now())
+  leftAt    DateTime?
+  active    Boolean  @default(true)
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role      Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([groupId])
+  @@index([roleId])
+  @@index([active])
+  @@index([studentId, active])
+  @@index([groupId, active])
+}
+
+model AdminSettings {
+  id           String   @id @default(cuid())
+  singletonKey Int      @unique @default(1)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
