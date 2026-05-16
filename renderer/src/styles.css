@@ -399,6 +399,50 @@ textarea {
   min-width: 145px;
 }
 
+.student-search-bar {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+}
+
+.student-search-bar input,
+.student-search-bar .select-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+.student-search-bar .student-filter-name {
+  grid-column: span 3;
+}
+
+.student-search-bar .student-filter-matricula,
+.student-search-bar .student-filter-generacion,
+.student-search-bar .student-filter-level {
+  grid-column: span 2;
+}
+
+.student-search-bar .student-filter-career,
+.student-search-bar .student-filter-program,
+.student-search-bar .student-filter-role {
+  grid-column: span 3;
+}
+
+.student-search-bar .student-filter-status {
+  grid-column: span 2;
+}
+
+.student-search-bar .student-status-filter {
+  min-width: 185px;
+}
+
+.student-search-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.65rem;
+}
+
 .search-actions {
   display: flex;
   gap: 0.55rem;
@@ -813,6 +857,19 @@ td {
   background: #fffdfa;
 }
 
+.trash-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trash-actions .small-button {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
 .account-password-card {
   max-width: 420px;
 }
@@ -984,6 +1041,24 @@ td {
   .profile-grid {
     grid-template-columns: 1fr;
   }
+
+  .student-search-bar {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .student-search-bar .student-filter-name,
+  .student-search-bar .student-filter-career,
+  .student-search-bar .student-filter-program,
+  .student-search-bar .student-filter-role {
+    grid-column: span 3;
+  }
+
+  .student-search-bar .student-filter-matricula,
+  .student-search-bar .student-filter-generacion,
+  .student-search-bar .student-filter-level,
+  .student-search-bar .student-filter-status {
+    grid-column: span 2;
+  }
 }
 
 @media (max-width: 820px) {
@@ -1021,6 +1096,26 @@ td {
 
   .search-actions {
     width: 100%;
+  }
+
+  .student-search-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .student-search-bar .student-filter-name,
+  .student-search-bar .student-filter-matricula,
+  .student-search-bar .student-filter-generacion,
+  .student-search-bar .student-filter-level,
+  .student-search-bar .student-filter-career,
+  .student-search-bar .student-filter-program,
+  .student-search-bar .student-filter-role,
+  .student-search-bar .student-filter-status,
+  .student-search-actions {
+    grid-column: 1;
+  }
+
+  .student-search-actions {
+    justify-content: stretch;
   }
 
   td {

@@ -45,6 +45,17 @@ export class CategoryService {
     return this.repository.restore(id);
   }
 
+  async permanentlyDeleteCategory(id: string) {
+    try {
+      return await this.repository.permanentDelete(id);
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND_OR_NOT_DELETED") {
+        throw new NotFoundError("La categoria no esta en la papelera.");
+      }
+      throw error;
+    }
+  }
+
   async getCategoryById(id: string) {
     return this.ensureCategoryExists(id);
   }

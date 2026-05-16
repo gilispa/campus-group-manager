@@ -43,6 +43,7 @@ export function registerIpcHandlers(): void {
     "categories:create": async (input) => services.categoryService.createCategory(input),
     "categories:update": async (input) => services.categoryService.updateCategory(input.id, input.data),
     "categories:delete": async (input) => services.categoryService.deleteCategory(input.id),
+    "categories:permanentDelete": async (input) => services.categoryService.permanentlyDeleteCategory(input.id),
     "categories:restore": async (input) => services.categoryService.restoreCategory(input.id),
     "categories:getById": async (input) => services.categoryService.getCategoryById(input.id),
     "categories:list": async () => services.categoryService.listCategories(),
@@ -51,6 +52,7 @@ export function registerIpcHandlers(): void {
     "roles:create": async (input) => services.roleService.createRole(input),
     "roles:update": async (input) => services.roleService.updateRole(input.id, input.data),
     "roles:delete": async (input) => services.roleService.deleteRole(input.id),
+    "roles:permanentDelete": async (input) => services.roleService.permanentlyDeleteRole(input.id),
     "roles:restore": async (input) => services.roleService.restoreRole(input.id),
     "roles:getById": async (input) => services.roleService.getRoleById(input.id),
     "roles:list": async () => services.roleService.listRoles(),
@@ -59,6 +61,7 @@ export function registerIpcHandlers(): void {
     "careers:create": async (input) => services.careerService.createCareer(input),
     "careers:update": async (input) => services.careerService.updateCareer(input.id, input.data),
     "careers:delete": async (input) => services.careerService.deleteCareer(input.id),
+    "careers:permanentDelete": async (input) => services.careerService.permanentlyDeleteCareer(input.id),
     "careers:restore": async (input) => services.careerService.restoreCareer(input.id),
     "careers:getById": async (input) => services.careerService.getCareerById(input.id),
     "careers:list": async () => services.careerService.listCareers(),
@@ -67,6 +70,7 @@ export function registerIpcHandlers(): void {
     "prepaPrograms:create": async (input) => services.prepaProgramService.createPrepaProgram(input),
     "prepaPrograms:update": async (input) => services.prepaProgramService.updatePrepaProgram(input.id, input.data),
     "prepaPrograms:delete": async (input) => services.prepaProgramService.deletePrepaProgram(input.id),
+    "prepaPrograms:permanentDelete": async (input) => services.prepaProgramService.permanentlyDeletePrepaProgram(input.id),
     "prepaPrograms:restore": async (input) => services.prepaProgramService.restorePrepaProgram(input.id),
     "prepaPrograms:getById": async (input) => services.prepaProgramService.getPrepaProgramById(input.id),
     "prepaPrograms:list": async () => services.prepaProgramService.listPrepaPrograms(),
@@ -75,6 +79,7 @@ export function registerIpcHandlers(): void {
     "students:create": async (input) => services.studentService.createStudent(input),
     "students:update": async (input) => services.studentService.updateStudent(input.id, input.data),
     "students:delete": async (input) => services.studentService.deleteStudent(input.id),
+    "students:permanentDelete": async (input) => services.studentService.permanentlyDeleteStudent(input.id),
     "students:restore": async (input) => services.studentService.restoreStudent(input.id),
     "students:getById": async (input) => services.studentService.getStudentById(input.id),
     "students:list": async () => services.studentService.listStudents(),
@@ -82,17 +87,40 @@ export function registerIpcHandlers(): void {
     "students:search": async (input) => services.studentService.searchStudents(input),
     "students:exportCsv": async (input) => {
       const rows = await services.studentService.searchStudents(input);
+      const memberships = await services.studentGroupService.listGroupsOfStudents(rows.map((student) => student.id));
+      const membershipsByStudentId = new Map<string, typeof memberships>();
+
+      for (const student of rows) {
+        membershipsByStudentId.set(student.id, memberships.filter((membership) => membership.studentId === student.id));
+      }
+
       return exportCsv("estudiantes.csv", [
-        ["Nombre", "Matricula", "Nivel", "Generacion", "Email", "Telefono", "Activo"],
-        ...rows.map((student) => [
-          student.nombre,
-          student.matricula,
-          student.nivel,
-          student.generacion,
-          student.email ?? "",
-          student.telefono ?? "",
-          student.activo ? "Si" : "No"
-        ])
+        ["Nombre", "Matricula", "Nivel", "Carrera", "Programa prepa", "Generacion", "Email", "Telefono", "Notas", "Activo", "Grupos activos", "Roles activos", "Total grupos activos", "Creado", "Actualizado"],
+        ...rows.map((student) => {
+          const relatedMemberships = membershipsByStudentId.get(student.id) ?? [];
+          const activeMemberships = relatedMemberships
+            .filter((membership) => membership.active && membership.group.deletedAt === null);
+
+          const activeGroupNames = activeMemberships.map((membership) => membership.group.nombre);
+          const activeRoleNames = Array.from(new Set(activeMemberships.map((membership) => membership.role?.name ?? "Sin rol")));
+          return [
+            student.nombre,
+            student.matricula,
+            student.nivel,
+            student.career?.name ?? "",
+            student.prepaProgram?.name ?? "",
+            student.generacion,
+            student.email ?? "",
+            student.telefono ?? "",
+            student.notas ?? "",
+            student.activo ? "Si" : "No",
+            activeGroupNames.join("; "),
+            activeRoleNames.join("; "),
+            activeGroupNames.length,
+            student.createdAt,
+            student.updatedAt
+          ];
+        })
       ]);
     },
     "students:pickPhoto": async () => {
@@ -107,6 +135,7 @@ export function registerIpcHandlers(): void {
     "groups:create": async (input) => services.groupService.createGroup(input),
     "groups:update": async (input) => services.groupService.updateGroup(input.id, input.data),
     "groups:delete": async (input) => services.groupService.deleteGroup(input.id),
+    "groups:permanentDelete": async (input) => services.groupService.permanentlyDeleteGroup(input.id),
     "groups:restore": async (input) => services.groupService.restoreGroup(input.id),
     "groups:getById": async (input) => services.groupService.getGroupById(input.id),
     "groups:list": async () => services.groupService.listGroups(),
@@ -115,16 +144,24 @@ export function registerIpcHandlers(): void {
     "groups:exportCsv": async (input) => {
       const rows = await services.groupService.searchGroups(input);
       return exportCsv("grupos.csv", [
-        ["Nombre", "Categoria", "Descripcion", "Creado"],
-        ...rows.map((group) => {
+        ["Nombre", "Categoria", "Descripcion", "Estudiantes activos", "Total estudiantes activos", "Matriculas activas", "Creado", "Actualizado"],
+        ...await Promise.all(rows.map(async (group) => {
+          const memberships = await services.studentGroupService.listStudentsOfGroup(group.id);
+          const activeMembers = memberships.filter((membership) => membership.active && membership.student.deletedAt === null);
+          const activeStudentNames = activeMembers.map((membership) => membership.student.nombre);
+          const activeMatriculas = activeMembers.map((membership) => membership.student.matricula);
           const groupWithCategory = group as typeof group & { category?: { name: string } | null };
           return [
             group.nombre,
             groupWithCategory.category?.name ?? "Sin categoria",
             group.descripcion ?? "",
-            group.createdAt
+            activeStudentNames.join("; "),
+            activeStudentNames.length,
+            activeMatriculas.join("; "),
+            group.createdAt,
+            group.updatedAt
           ];
-        })
+        }))
       ]);
     },
     "groups:pickLogo": async () => {

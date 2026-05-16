@@ -50,4 +50,14 @@ export class CategoryRepository {
   async restore(id: string): Promise<Category> {
     return this.prisma.category.update({ where: { id }, data: { deletedAt: null } });
   }
+
+  async permanentDelete(id: string): Promise<Category> {
+    const deleted = await this.prisma.category.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.category.delete({ where: { id } });
+    return deleted;
+  }
 }

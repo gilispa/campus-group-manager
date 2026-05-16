@@ -46,4 +46,14 @@ export class CareerRepository {
   async restore(id: string): Promise<Career> {
     return this.prisma.career.update({ where: { id }, data: { deletedAt: null } });
   }
+
+  async permanentDelete(id: string): Promise<Career> {
+    const deleted = await this.prisma.career.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.career.delete({ where: { id } });
+    return deleted;
+  }
 }

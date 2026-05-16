@@ -46,4 +46,14 @@ export class PrepaProgramRepository {
   async restore(id: string): Promise<PrepaProgram> {
     return this.prisma.prepaProgram.update({ where: { id }, data: { deletedAt: null } });
   }
+
+  async permanentDelete(id: string): Promise<PrepaProgram> {
+    const deleted = await this.prisma.prepaProgram.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.prepaProgram.delete({ where: { id } });
+    return deleted;
+  }
 }

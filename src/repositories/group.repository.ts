@@ -72,4 +72,18 @@ export class GroupRepository {
   async restore(id: string): Promise<Group> {
     return this.prisma.group.update({ where: { id }, data: { deletedAt: null }, include: { category: true } });
   }
+
+  async permanentDelete(id: string): Promise<Group> {
+    const deleted = await this.prisma.group.findFirst({
+      where: { id, deletedAt: { not: null } },
+      include: { category: true }
+    });
+
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.group.delete({ where: { id } });
+    return deleted;
+  }
 }

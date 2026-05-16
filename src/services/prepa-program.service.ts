@@ -45,6 +45,17 @@ export class PrepaProgramService {
     return this.repository.restore(id);
   }
 
+  async permanentlyDeletePrepaProgram(id: string) {
+    try {
+      return await this.repository.permanentDelete(id);
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND_OR_NOT_DELETED") {
+        throw new NotFoundError("El programa no esta en la papelera.");
+      }
+      throw error;
+    }
+  }
+
   async getPrepaProgramById(id: string) {
     return this.ensurePrepaProgramExists(id);
   }

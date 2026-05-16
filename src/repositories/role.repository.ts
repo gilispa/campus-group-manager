@@ -50,4 +50,14 @@ export class RoleRepository {
   async restore(id: string): Promise<Role> {
     return this.prisma.role.update({ where: { id }, data: { deletedAt: null } });
   }
+
+  async permanentDelete(id: string): Promise<Role> {
+    const deleted = await this.prisma.role.findFirst({ where: { id, deletedAt: { not: null } } });
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.role.delete({ where: { id } });
+    return deleted;
+  }
 }

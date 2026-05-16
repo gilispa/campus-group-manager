@@ -44,6 +44,7 @@ export interface IpcChannelMap {
   "categories:create": { input: CategoryCreateInput; output: unknown };
   "categories:update": { input: { id: string; data: CategoryUpdateInput }; output: unknown };
   "categories:delete": { input: { id: string }; output: unknown };
+  "categories:permanentDelete": { input: { id: string }; output: unknown };
   "categories:restore": { input: { id: string }; output: unknown };
   "categories:getById": { input: { id: string }; output: unknown };
   "categories:list": { input: void; output: unknown[] };
@@ -52,6 +53,7 @@ export interface IpcChannelMap {
   "roles:create": { input: RoleCreateInput; output: unknown };
   "roles:update": { input: { id: string; data: RoleUpdateInput }; output: unknown };
   "roles:delete": { input: { id: string }; output: unknown };
+  "roles:permanentDelete": { input: { id: string }; output: unknown };
   "roles:restore": { input: { id: string }; output: unknown };
   "roles:getById": { input: { id: string }; output: unknown };
   "roles:list": { input: void; output: unknown[] };
@@ -60,6 +62,7 @@ export interface IpcChannelMap {
   "careers:create": { input: CareerCreateInput; output: unknown };
   "careers:update": { input: { id: string; data: CareerUpdateInput }; output: unknown };
   "careers:delete": { input: { id: string }; output: unknown };
+  "careers:permanentDelete": { input: { id: string }; output: unknown };
   "careers:restore": { input: { id: string }; output: unknown };
   "careers:getById": { input: { id: string }; output: unknown };
   "careers:list": { input: void; output: unknown[] };
@@ -68,6 +71,7 @@ export interface IpcChannelMap {
   "prepaPrograms:create": { input: PrepaProgramCreateInput; output: unknown };
   "prepaPrograms:update": { input: { id: string; data: PrepaProgramUpdateInput }; output: unknown };
   "prepaPrograms:delete": { input: { id: string }; output: unknown };
+  "prepaPrograms:permanentDelete": { input: { id: string }; output: unknown };
   "prepaPrograms:restore": { input: { id: string }; output: unknown };
   "prepaPrograms:getById": { input: { id: string }; output: unknown };
   "prepaPrograms:list": { input: void; output: unknown[] };
@@ -76,6 +80,7 @@ export interface IpcChannelMap {
   "students:create": { input: StudentCreateInput; output: unknown };
   "students:update": { input: { id: string; data: StudentUpdateInput }; output: unknown };
   "students:delete": { input: { id: string }; output: unknown };
+  "students:permanentDelete": { input: { id: string }; output: unknown };
   "students:restore": { input: { id: string }; output: unknown };
   "students:getById": { input: { id: string }; output: unknown };
   "students:list": { input: void; output: unknown[] };
@@ -88,6 +93,7 @@ export interface IpcChannelMap {
   "groups:create": { input: GroupCreateInput; output: unknown };
   "groups:update": { input: { id: string; data: GroupUpdateInput }; output: unknown };
   "groups:delete": { input: { id: string }; output: unknown };
+  "groups:permanentDelete": { input: { id: string }; output: unknown };
   "groups:restore": { input: { id: string }; output: unknown };
   "groups:getById": { input: { id: string }; output: unknown };
   "groups:list": { input: void; output: unknown[] };
@@ -131,6 +137,7 @@ export interface DesktopApi {
     create(input: CategoryCreateInput): Promise<unknown>;
     update(id: string, data: CategoryUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;
@@ -140,6 +147,7 @@ export interface DesktopApi {
     create(input: RoleCreateInput): Promise<unknown>;
     update(id: string, data: RoleUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;
@@ -149,6 +157,7 @@ export interface DesktopApi {
     create(input: CareerCreateInput): Promise<unknown>;
     update(id: string, data: CareerUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;
@@ -158,6 +167,7 @@ export interface DesktopApi {
     create(input: PrepaProgramCreateInput): Promise<unknown>;
     update(id: string, data: PrepaProgramUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;
@@ -167,6 +177,7 @@ export interface DesktopApi {
     create(input: StudentCreateInput): Promise<unknown>;
     update(id: string, data: StudentUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;
@@ -180,6 +191,7 @@ export interface DesktopApi {
     create(input: GroupCreateInput): Promise<unknown>;
     update(id: string, data: GroupUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
     getById(id: string): Promise<unknown>;
     list(): Promise<unknown[]>;

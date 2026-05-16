@@ -793,6 +793,62 @@ export function App() {
     }, "Catalogo restaurado.", "Restaurando catalogo...");
   }
 
+  async function permanentlyDeleteStudent(id: string) {
+    confirmAction(
+      "Eliminar estudiante definitivamente",
+      "Esta accion es irreversible y eliminara el estudiante de forma permanente. Si tiene foto guardada, tambien se eliminara.",
+      "Eliminar definitivamente",
+      async () => {
+        await withAction(async () => {
+          await desktopApi.students.permanentDelete(id);
+          await refreshData();
+          await loadTrash();
+        }, "Estudiante eliminado definitivamente.", "Eliminando de papelera...");
+      }
+    );
+  }
+
+  async function permanentlyDeleteGroup(id: string) {
+    confirmAction(
+      "Eliminar grupo definitivamente",
+      "Esta accion es irreversible y eliminara el grupo de forma permanente. Si tiene logo guardado, tambien se eliminara.",
+      "Eliminar definitivamente",
+      async () => {
+        await withAction(async () => {
+          await desktopApi.groups.permanentDelete(id);
+          await refreshData();
+          await loadTrash();
+        }, "Grupo eliminado definitivamente.", "Eliminando de papelera...");
+      }
+    );
+  }
+
+  async function permanentlyDeleteCatalog(type: CatalogType, id: string) {
+    confirmAction(
+      "Eliminar catalogo definitivamente",
+      "Esta accion es irreversible y eliminara el registro de forma permanente.",
+      "Eliminar definitivamente",
+      async () => {
+        await withAction(async () => {
+          if (type === "category") {
+            await desktopApi.categories.permanentDelete(id);
+          }
+          if (type === "role") {
+            await desktopApi.roles.permanentDelete(id);
+          }
+          if (type === "career") {
+            await desktopApi.careers.permanentDelete(id);
+          }
+          if (type === "program") {
+            await desktopApi.prepaPrograms.permanentDelete(id);
+          }
+          await refreshData();
+          await loadTrash();
+        }, "Catalogo eliminado definitivamente.", "Eliminando de papelera...");
+      }
+    );
+  }
+
   async function importDatabaseDirect() {
     confirmAction("Importar respaldo", "Esto reemplazara la base actual. Asegurate de tener una copia antes de continuar.", "Importar", async () => {
       await withAction(async () => {
@@ -1007,39 +1063,39 @@ export function App() {
 
         {view === "students" ? (
           <section className="stack-gap">
-            <div className="search-bar-horizontal">
-              <input value={studentSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, nombre: event.target.value })} placeholder="Nombre" />
-              <input value={studentSearch.matricula} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, matricula: event.target.value })} placeholder="Matricula" />
-              <input value={studentSearch.generacion} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, generacion: event.target.value })} placeholder="Generacion" />
-              <SelectField value={studentSearch.nivel} onChange={(event) => setStudentSearch({ ...studentSearch, nivel: event.target.value })}>
+            <div className="search-bar-horizontal student-search-bar">
+              <input className="student-filter-name" value={studentSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, nombre: event.target.value })} placeholder="Nombre" />
+              <input className="student-filter-matricula" value={studentSearch.matricula} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, matricula: event.target.value })} placeholder="Matricula" />
+              <input className="student-filter-generacion" value={studentSearch.generacion} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, generacion: event.target.value })} placeholder="Generacion" />
+              <SelectField shellClassName="student-filter-level" value={studentSearch.nivel} onChange={(event) => setStudentSearch({ ...studentSearch, nivel: event.target.value })}>
                 <option value="">Todos los niveles</option>
                 <option value="PROFESIONAL">PROFESIONAL</option>
                 <option value="PREPA">PREPA</option>
               </SelectField>
-              <SelectField value={studentSearch.careerId} onChange={(event) => setStudentSearch({ ...studentSearch, careerId: event.target.value })}>
+              <SelectField shellClassName="student-filter-career" value={studentSearch.careerId} onChange={(event) => setStudentSearch({ ...studentSearch, careerId: event.target.value })}>
                 <option value="">Todas las carreras</option>
                 {careers.map((career) => (
                   <option key={career.id} value={career.id}>{career.name}</option>
                 ))}
               </SelectField>
-              <SelectField value={studentSearch.prepaProgramId} onChange={(event) => setStudentSearch({ ...studentSearch, prepaProgramId: event.target.value })}>
+              <SelectField shellClassName="student-filter-program" value={studentSearch.prepaProgramId} onChange={(event) => setStudentSearch({ ...studentSearch, prepaProgramId: event.target.value })}>
                 <option value="">Todos los programas</option>
                 {prepaPrograms.map((program) => (
                   <option key={program.id} value={program.id}>{program.name}</option>
                 ))}
               </SelectField>
-              <SelectField value={studentSearch.roleId} onChange={(event) => setStudentSearch({ ...studentSearch, roleId: event.target.value })}>
+              <SelectField shellClassName="student-filter-role" value={studentSearch.roleId} onChange={(event) => setStudentSearch({ ...studentSearch, roleId: event.target.value })}>
                 <option value="">Todos los roles</option>
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>{role.name}</option>
                 ))}
               </SelectField>
-              <SelectField value={studentSearch.activo} onChange={(event) => setStudentSearch({ ...studentSearch, activo: event.target.value })}>
+              <SelectField shellClassName="student-filter-status student-status-filter" value={studentSearch.activo} onChange={(event) => setStudentSearch({ ...studentSearch, activo: event.target.value })}>
                 <option value="">Activos e inactivos</option>
                 <option value="true">Solo activos</option>
                 <option value="false">Solo inactivos</option>
               </SelectField>
-              <div className="search-actions">
+              <div className="search-actions student-search-actions">
                 <button onClick={() => void searchStudents()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setStudentSearch(emptyStudentSearch); void refreshData(); }}>Limpiar</button>
                 <button className="ghost-button" onClick={() => void exportStudentsCsv()}>Exportar CSV</button>
@@ -1179,12 +1235,12 @@ export function App() {
               </div>
               <p className="muted">Restaura estudiantes, grupos y catalogos eliminados.</p>
               <div className="trash-grid six-panels">
-                <TrashList title="Estudiantes" items={deletedStudents.map((student) => ({ id: student.id, label: student.nombre }))} onRestore={(id) => void restoreStudent(id)} />
-                <TrashList title="Grupos" items={deletedGroups.map((group) => ({ id: group.id, label: group.nombre }))} onRestore={(id) => void restoreGroup(id)} />
-                <TrashList title="Categorias" items={deletedCategories.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("category", id)} />
-                <TrashList title="Roles" items={deletedRoles.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("role", id)} />
-                <TrashList title="Carreras" items={deletedCareers.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("career", id)} />
-                <TrashList title="Programas" items={deletedPrograms.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("program", id)} />
+                <TrashList title="Estudiantes" items={deletedStudents.map((student) => ({ id: student.id, label: student.nombre }))} onRestore={(id) => void restoreStudent(id)} onPermanentDelete={(id) => void permanentlyDeleteStudent(id)} />
+                <TrashList title="Grupos" items={deletedGroups.map((group) => ({ id: group.id, label: group.nombre }))} onRestore={(id) => void restoreGroup(id)} onPermanentDelete={(id) => void permanentlyDeleteGroup(id)} />
+                <TrashList title="Categorias" items={deletedCategories.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("category", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("category", id)} />
+                <TrashList title="Roles" items={deletedRoles.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("role", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("role", id)} />
+                <TrashList title="Carreras" items={deletedCareers.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("career", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("career", id)} />
+                <TrashList title="Programas" items={deletedPrograms.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("program", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("program", id)} />
               </div>
             </div>
           </section>
@@ -1642,19 +1698,23 @@ function CatalogSection(props: {
 function SelectField({
   children,
   className = "",
+  shellClassName = "",
   compact = false,
   value,
   disabled,
   onChange,
   ...props
-}: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; compact?: boolean }) {
+}: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; compact?: boolean; shellClassName?: string }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const options = useMemo(() => getSelectOptions(children), [children]);
   const selectedValue = value == null ? "" : String(value);
   const selectedOption = options.find((option) => option.value === selectedValue) ?? null;
   const selectedLabel = selectedOption?.label ?? "";
-  const shellClassName = compact ? "select-shell compact" : "select-shell";
+  const shellClassNames = [
+    compact ? "select-shell compact" : "select-shell",
+    shellClassName
+  ].filter(Boolean).join(" ");
   const fieldClassName = className ? `select-trigger ${className}` : "select-trigger";
 
   useEffect(() => {
@@ -1696,7 +1756,7 @@ function SelectField({
   }
 
   return (
-    <div className={shellClassName} title={selectedLabel} ref={containerRef}>
+    <div className={shellClassNames} title={selectedLabel} ref={containerRef}>
       <button
         type="button"
         className={fieldClassName}

@@ -42,6 +42,19 @@ export class GroupService {
     return this.repository.restore(id);
   }
 
+  async permanentlyDeleteGroup(id: string) {
+    try {
+      const deletedGroup = await this.repository.permanentDelete(id);
+      await this.removeStoredGroupLogo(deletedGroup.logo);
+      return deletedGroup;
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND_OR_NOT_DELETED") {
+        throw new NotFoundError("El grupo no esta en la papelera.");
+      }
+      throw error;
+    }
+  }
+
   async getGroupById(id: string) {
     return this.ensureGroupExists(id);
   }
@@ -79,6 +92,16 @@ export class GroupService {
     }
 
     return `${uploadPrefixes.groups}${fileName}`;
+  }
+
+  private async removeStoredGroupLogo(logoPath?: string | null) {
+    if (!logoPath || !logoPath.startsWith(uploadPrefixes.groups)) {
+      return;
+    }
+
+    const fileName = path.basename(logoPath);
+    const absolutePath = path.join(appPaths.groupUploadsDir, fileName);
+    await fs.rm(absolutePath, { force: true });
   }
 
   private async ensureCategoryExists(id: string) {

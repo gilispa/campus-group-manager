@@ -57,6 +57,19 @@ export class StudentService {
     return this.repository.restore(id);
   }
 
+  async permanentlyDeleteStudent(id: string) {
+    try {
+      const deletedStudent = await this.repository.permanentDelete(id);
+      await this.removeStoredStudentPhoto(deletedStudent.foto);
+      return deletedStudent;
+    } catch (error) {
+      if (error instanceof Error && error.message === "NOT_FOUND_OR_NOT_DELETED") {
+        throw new NotFoundError("El estudiante no esta en la papelera.");
+      }
+      throw error;
+    }
+  }
+
   async getStudentById(id: string) {
     return this.ensureStudentExists(id);
   }
@@ -94,6 +107,16 @@ export class StudentService {
     }
 
     return `${uploadPrefixes.students}${fileName}`;
+  }
+
+  private async removeStoredStudentPhoto(photoPath?: string | null) {
+    if (!photoPath || !photoPath.startsWith(uploadPrefixes.students)) {
+      return;
+    }
+
+    const fileName = path.basename(photoPath);
+    const absolutePath = path.join(appPaths.studentUploadsDir, fileName);
+    await fs.rm(absolutePath, { force: true });
   }
 
   private async ensureStudentExists(id: string) {

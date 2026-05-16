@@ -154,4 +154,21 @@ export class StudentRepository {
       }
     });
   }
+
+  async permanentDelete(id: string): Promise<Student> {
+    const deleted = await this.prisma.student.findFirst({
+      where: { id, deletedAt: { not: null } },
+      include: {
+        career: true,
+        prepaProgram: true
+      }
+    });
+
+    if (!deleted) {
+      throw new Error("NOT_FOUND_OR_NOT_DELETED");
+    }
+
+    await this.prisma.student.delete({ where: { id } });
+    return deleted;
+  }
 }
