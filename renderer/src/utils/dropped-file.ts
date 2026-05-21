@@ -1,9 +1,16 @@
 import type { DragEvent } from "react";
 
-export function extractDroppedSourcePath(event: DragEvent<HTMLDivElement>): string | null {
+export async function extractDroppedSourcePath(event: DragEvent<HTMLDivElement>): Promise<string | null> {
   const droppedFile = event.dataTransfer.files[0] as (File & { path?: string }) | undefined;
   if (droppedFile?.path) {
     return droppedFile.path;
+  }
+
+  if (droppedFile) {
+    const electronPath = window.desktopApi.meta.getPathForFile(droppedFile);
+    if (electronPath) {
+      return electronPath;
+    }
   }
 
   const uriList = event.dataTransfer.getData("text/uri-list");

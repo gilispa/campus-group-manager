@@ -6,6 +6,7 @@ import type {
   CategoryCreateInput,
   CategoryUpdateInput,
   ChangeMembershipRoleInput,
+  GroupCsvExportInput,
   GroupCreateInput,
   GroupSearchFilters,
   PrepaProgramCreateInput,
@@ -16,6 +17,7 @@ import type {
   RoleUpdateInput,
   SetAdminPasswordInput,
   StudentCreateInput,
+  StudentCsvExportInput,
   StudentSearchFilters,
   StudentUpdateInput
 } from "./domain";
@@ -86,7 +88,7 @@ export interface IpcChannelMap {
   "students:list": { input: void; output: unknown[] };
   "students:listDeleted": { input: void; output: unknown[] };
   "students:search": { input: StudentSearchFilters; output: unknown[] };
-  "students:exportCsv": { input: StudentSearchFilters; output: string | null };
+  "students:exportCsv": { input: StudentCsvExportInput; output: string | null };
   "students:pickPhoto": { input: void; output: string | null };
   "students:savePhoto": { input: { sourcePath: string; currentPhoto?: string | null }; output: string };
 
@@ -99,7 +101,7 @@ export interface IpcChannelMap {
   "groups:list": { input: void; output: unknown[] };
   "groups:listDeleted": { input: void; output: unknown[] };
   "groups:search": { input: GroupSearchFilters; output: unknown[] };
-  "groups:exportCsv": { input: GroupSearchFilters; output: string | null };
+  "groups:exportCsv": { input: GroupCsvExportInput; output: string | null };
   "groups:pickLogo": { input: void; output: string | null };
   "groups:saveLogo": { input: { sourcePath: string; currentLogo?: string | null }; output: string };
 
@@ -183,7 +185,7 @@ export interface DesktopApi {
     list(): Promise<unknown[]>;
     listDeleted(): Promise<unknown[]>;
     search(filters: StudentSearchFilters): Promise<unknown[]>;
-    exportCsv(filters: StudentSearchFilters): Promise<string | null>;
+    exportCsv(input: StudentCsvExportInput): Promise<string | null>;
     pickPhoto(): Promise<string | null>;
     savePhoto(sourcePath: string, currentPhoto?: string | null): Promise<string>;
   };
@@ -197,7 +199,7 @@ export interface DesktopApi {
     list(): Promise<unknown[]>;
     listDeleted(): Promise<unknown[]>;
     search(filters: GroupSearchFilters): Promise<unknown[]>;
-    exportCsv(filters: GroupSearchFilters): Promise<string | null>;
+    exportCsv(input: GroupCsvExportInput): Promise<string | null>;
     pickLogo(): Promise<string | null>;
     saveLogo(sourcePath: string, currentLogo?: string | null): Promise<string>;
   };
@@ -221,5 +223,6 @@ export interface DesktopApi {
     getSummary(): Promise<AppMetaSummary>;
     resolveAssetUrl(assetPath?: string | null): Promise<string | null>;
     resolveDroppedPath(candidatePath: string, kind: "student" | "group"): Promise<string | null>;
+    getPathForFile(file: unknown): string | null;
   };
 }

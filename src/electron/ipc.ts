@@ -5,12 +5,71 @@ import { dialog, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { appPaths, uploadPrefixes } from "../config/paths";
 import { createBackendServices } from "../main/container";
 import type { IpcChannel, IpcChannelMap } from "../types/ipc";
+import type { GroupExportColumn, StudentExportColumn } from "../types/domain";
 import { AuthenticationError } from "../utils/errors";
 
 type Handler<K extends IpcChannel> = (input: IpcChannelMap[K]["input"], event: IpcMainInvokeEvent) => Promise<IpcChannelMap[K]["output"]>;
 
 const publicChannels = new Set<IpcChannel>(["auth:status", "auth:setInitialPassword", "auth:login"]);
 const authenticatedSenders = new Set<number>();
+const defaultStudentExportColumns: StudentExportColumn[] = [
+  "nombre",
+  "matricula",
+  "nivel",
+  "career",
+  "prepaProgram",
+  "generacion",
+  "email",
+  "telefono",
+  "notas",
+  "activo",
+  "activeGroups",
+  "activeRoles",
+  "activeGroupCount",
+  "createdAt",
+  "updatedAt"
+];
+const defaultGroupExportColumns: GroupExportColumn[] = [
+  "nombre",
+  "category",
+  "descripcion",
+  "activeStudents",
+  "activeStudentCount",
+  "activeMatriculas",
+  "activeEmails",
+  "activeRoles",
+  "createdAt",
+  "updatedAt"
+];
+const studentExportLabels: Record<StudentExportColumn, string> = {
+  nombre: "Nombre",
+  matricula: "Matricula",
+  nivel: "Nivel",
+  career: "Carrera",
+  prepaProgram: "Programa prepa",
+  generacion: "Generacion",
+  email: "Email",
+  telefono: "Telefono",
+  notas: "Notas",
+  activo: "Activo",
+  activeGroups: "Grupos activos",
+  activeRoles: "Roles activos",
+  activeGroupCount: "Total grupos activos",
+  createdAt: "Creado",
+  updatedAt: "Actualizado"
+};
+const groupExportLabels: Record<GroupExportColumn, string> = {
+  nombre: "Nombre",
+  category: "Categoria",
+  descripcion: "Descripcion",
+  activeStudents: "Estudiantes activos",
+  activeMatriculas: "Matriculas activas",
+  activeEmails: "Correos activos",
+  activeRoles: "Roles presentes",
+  activeStudentCount: "Total estudiantes activos",
+  createdAt: "Creado",
+  updatedAt: "Actualizado"
+};
 
 export function registerIpcHandlers(): void {
   const services = createBackendServices();
@@ -86,7 +145,8 @@ export function registerIpcHandlers(): void {
     "students:listDeleted": async () => services.studentService.listDeletedStudents(),
     "students:search": async (input) => services.studentService.searchStudents(input),
     "students:exportCsv": async (input) => {
-      const rows = await services.studentService.searchStudents(input);
+      const columns = selectExportColumns(input.columns, defaultStudentExportColumns, studentExportLabels);
+      const rows = await services.studentService.searchStudents(input.filters);
       const memberships = await services.studentGroupService.listGroupsOfStudents(rows.map((student) => student.id));
       const membershipsByStudentId = new Map<string, typeof memberships>();
 
@@ -95,31 +155,32 @@ export function registerIpcHandlers(): void {
       }
 
       return exportCsv("estudiantes.csv", [
-        ["Nombre", "Matricula", "Nivel", "Carrera", "Programa prepa", "Generacion", "Email", "Telefono", "Notas", "Activo", "Grupos activos", "Roles activos", "Total grupos activos", "Creado", "Actualizado"],
+        columns.map((column) => studentExportLabels[column]),
         ...rows.map((student) => {
           const relatedMemberships = membershipsByStudentId.get(student.id) ?? [];
           const activeMemberships = relatedMemberships
-            .filter((membership) => membership.active && membership.group.deletedAt === null);
+            .filter((membership) => (input.filters.participationStatus === "all" || membership.active) && membership.group.deletedAt === null);
 
           const activeGroupNames = activeMemberships.map((membership) => membership.group.nombre);
           const activeRoleNames = Array.from(new Set(activeMemberships.map((membership) => membership.role?.name ?? "Sin rol")));
-          return [
-            student.nombre,
-            student.matricula,
-            student.nivel,
-            student.career?.name ?? "",
-            student.prepaProgram?.name ?? "",
-            student.generacion,
-            student.email ?? "",
-            student.telefono ?? "",
-            student.notas ?? "",
-            student.activo ? "Si" : "No",
-            activeGroupNames.join("; "),
-            activeRoleNames.join("; "),
-            activeGroupNames.length,
-            student.createdAt,
-            student.updatedAt
-          ];
+          const values: Record<StudentExportColumn, string | number | Date> = {
+            nombre: student.nombre,
+            matricula: student.matricula,
+            nivel: student.nivel,
+            career: student.career?.name ?? "",
+            prepaProgram: student.prepaProgram?.name ?? "",
+            generacion: student.generacion,
+            email: student.email ?? "",
+            telefono: student.telefono ?? "",
+            notas: student.notas ?? "",
+            activo: student.activo ? "Si" : "No",
+            activeGroups: activeGroupNames.join("; "),
+            activeRoles: activeRoleNames.join("; "),
+            activeGroupCount: activeGroupNames.length,
+            createdAt: student.createdAt,
+            updatedAt: student.updatedAt
+          };
+          return columns.map((column) => values[column]);
         })
       ]);
     },
@@ -142,25 +203,31 @@ export function registerIpcHandlers(): void {
     "groups:listDeleted": async () => services.groupService.listDeletedGroups(),
     "groups:search": async (input) => services.groupService.searchGroups(input),
     "groups:exportCsv": async (input) => {
-      const rows = await services.groupService.searchGroups(input);
+      const columns = selectExportColumns(input.columns, defaultGroupExportColumns, groupExportLabels);
+      const rows = await services.groupService.searchGroups(input.filters);
       return exportCsv("grupos.csv", [
-        ["Nombre", "Categoria", "Descripcion", "Estudiantes activos", "Total estudiantes activos", "Matriculas activas", "Creado", "Actualizado"],
+        columns.map((column) => groupExportLabels[column]),
         ...await Promise.all(rows.map(async (group) => {
           const memberships = await services.studentGroupService.listStudentsOfGroup(group.id);
-          const activeMembers = memberships.filter((membership) => membership.active && membership.student.deletedAt === null);
+          const activeMembers = memberships.filter((membership) => (input.filters.participationStatus === "all" || membership.active) && membership.student.deletedAt === null);
           const activeStudentNames = activeMembers.map((membership) => membership.student.nombre);
           const activeMatriculas = activeMembers.map((membership) => membership.student.matricula);
+          const activeEmails = activeMembers.map((membership) => membership.student.email ?? "").filter(Boolean);
+          const activeRoles = Array.from(new Set(activeMembers.map((membership) => membership.role?.name ?? "Sin rol")));
           const groupWithCategory = group as typeof group & { category?: { name: string } | null };
-          return [
-            group.nombre,
-            groupWithCategory.category?.name ?? "Sin categoria",
-            group.descripcion ?? "",
-            activeStudentNames.join("; "),
-            activeStudentNames.length,
-            activeMatriculas.join("; "),
-            group.createdAt,
-            group.updatedAt
-          ];
+          const values: Record<GroupExportColumn, string | number | Date> = {
+            nombre: group.nombre,
+            category: groupWithCategory.category?.name ?? "Sin categoria",
+            descripcion: group.descripcion ?? "",
+            activeStudents: activeStudentNames.join("; "),
+            activeMatriculas: activeMatriculas.join("; "),
+            activeEmails: activeEmails.join("; "),
+            activeRoles: activeRoles.join("; "),
+            activeStudentCount: activeStudentNames.length,
+            createdAt: group.createdAt,
+            updatedAt: group.updatedAt
+          };
+          return columns.map((column) => values[column]);
         }))
       ]);
     },
@@ -256,6 +323,16 @@ async function resolveDroppedPath(candidatePath: string, kind: "student" | "grou
 
   await fs.access(decodedPath);
   return decodedPath;
+}
+
+function selectExportColumns<T extends string>(
+  requested: T[],
+  fallback: T[],
+  labels: Record<T, string>
+): T[] {
+  const allowed = new Set(Object.keys(labels));
+  const columns = requested.filter((column) => allowed.has(column));
+  return columns.length > 0 ? columns : fallback;
 }
 
 async function exportCsv(defaultPath: string, rows: Array<Array<string | number | boolean | Date | null | undefined>>): Promise<string | null> {

@@ -19,15 +19,20 @@ export class GroupService {
     if (data.categoryId) {
       await this.ensureCategoryExists(data.categoryId);
     }
+    await this.ensureGroupNameIsUnique(data.nombre);
     return this.repository.create(data);
   }
 
   async updateGroup(id: string, input: GroupUpdateInput) {
-    await this.ensureGroupExists(id);
+    const current = await this.ensureGroupExists(id);
     const data = validateGroupUpdate(input);
 
     if (data.categoryId) {
       await this.ensureCategoryExists(data.categoryId);
+    }
+
+    if (data.nombre && data.nombre !== current.nombre) {
+      await this.ensureGroupNameIsUnique(data.nombre, id);
     }
 
     return this.repository.update(id, data);
@@ -120,5 +125,12 @@ export class GroupService {
     }
 
     return group;
+  }
+
+  private async ensureGroupNameIsUnique(nombre: string, excludeId?: string) {
+    const duplicate = await this.repository.findByName(nombre, excludeId);
+    if (duplicate) {
+      throw new ConflictError("Ya existe un grupo con ese nombre.");
+    }
   }
 }

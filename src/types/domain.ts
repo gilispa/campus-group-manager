@@ -46,6 +46,7 @@ export interface StudentUpdateInput {
 }
 
 export interface StudentSearchFilters {
+  studentIds?: string[];
   nombre?: string;
   matricula?: string;
   careerId?: string;
@@ -53,6 +54,10 @@ export interface StudentSearchFilters {
   generacion?: number;
   nivel?: StudentLevel;
   roleId?: string;
+  roleIds?: string[];
+  groupIds?: string[];
+  categoryIds?: string[];
+  participationStatus?: ParticipationExportScope;
   activo?: boolean;
 }
 
@@ -73,7 +78,53 @@ export interface GroupUpdateInput {
 export interface GroupSearchFilters {
   nombre?: string;
   categoryId?: string;
+  categoryIds?: string[];
+  groupIds?: string[];
+  roleIds?: string[];
+  studentLevel?: StudentLevel;
+  participationStatus?: ParticipationExportScope;
   categoryName?: string;
+}
+
+export type ParticipationExportScope = "active" | "all";
+
+export type StudentExportColumn =
+  | "nombre"
+  | "matricula"
+  | "nivel"
+  | "career"
+  | "prepaProgram"
+  | "generacion"
+  | "email"
+  | "telefono"
+  | "notas"
+  | "activo"
+  | "activeGroups"
+  | "activeRoles"
+  | "activeGroupCount"
+  | "createdAt"
+  | "updatedAt";
+
+export type GroupExportColumn =
+  | "nombre"
+  | "category"
+  | "descripcion"
+  | "activeStudents"
+  | "activeMatriculas"
+  | "activeEmails"
+  | "activeRoles"
+  | "activeStudentCount"
+  | "createdAt"
+  | "updatedAt";
+
+export interface StudentCsvExportInput {
+  filters: StudentSearchFilters;
+  columns: StudentExportColumn[];
+}
+
+export interface GroupCsvExportInput {
+  filters: GroupSearchFilters;
+  columns: GroupExportColumn[];
 }
 
 export interface CategoryCreateInput {

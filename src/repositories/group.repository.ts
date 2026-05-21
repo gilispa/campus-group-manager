@@ -35,15 +35,49 @@ export class GroupRepository {
     return this.prisma.group.findFirst({ where: { id, deletedAt: null }, include: { category: true } });
   }
 
+  async findByName(nombre: string, excludeId?: string): Promise<Group | null> {
+    return this.prisma.group.findFirst({
+      where: {
+        nombre,
+        deletedAt: null,
+        ...(excludeId ? { NOT: { id: excludeId } } : {})
+      },
+      include: { category: true }
+    });
+  }
+
   async list(): Promise<Group[]> {
     return this.prisma.group.findMany({ where: { deletedAt: null }, include: { category: true }, orderBy: { nombre: "asc" } });
   }
 
   async search(filters: GroupSearchFilters): Promise<Group[]> {
+    const categoryIds = [
+      ...(filters.categoryId ? [filters.categoryId] : []),
+      ...(filters.categoryIds ?? [])
+    ];
+    const roleIds = filters.roleIds ?? [];
+    const shouldFilterMemberships = roleIds.length > 0 || Boolean(filters.studentLevel);
+    const studentWhere: Prisma.StudentWhereInput = {
+      deletedAt: null,
+      ...(filters.studentLevel ? { nivel: filters.studentLevel } : {})
+    };
+    const membershipWhere: Prisma.StudentGroupWhereInput = {
+      ...(filters.participationStatus === "all" ? {} : { active: true }),
+      ...(roleIds.length > 0 ? { roleId: { in: roleIds } } : {}),
+      ...(shouldFilterMemberships ? { student: studentWhere } : {})
+    };
     const where: Prisma.GroupWhereInput = {
       deletedAt: null,
+      ...(filters.groupIds?.length ? { id: { in: filters.groupIds } } : {}),
       ...(filters.nombre ? { nombre: { contains: filters.nombre } } : {}),
-      ...(filters.categoryId ? { categoryId: filters.categoryId } : {}),
+      ...(categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {}),
+      ...(shouldFilterMemberships
+        ? {
+            memberships: {
+              some: membershipWhere
+            }
+          }
+        : {}),
       ...(filters.categoryName
         ? { category: { name: { contains: filters.categoryName } } }
         : {})

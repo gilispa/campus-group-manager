@@ -28,6 +28,15 @@ export function validateGroupSearchFilters(filters: GroupSearchFilters): GroupSe
   return {
     ...(filters.nombre ? { nombre: filters.nombre.trim() } : {}),
     ...(filters.categoryId ? { categoryId: filters.categoryId.trim() } : {}),
+    ...(filters.categoryIds ? { categoryIds: normalizeStringList(filters.categoryIds) } : {}),
+    ...(filters.groupIds ? { groupIds: normalizeStringList(filters.groupIds) } : {}),
+    ...(filters.roleIds ? { roleIds: normalizeStringList(filters.roleIds) } : {}),
+    ...(filters.studentLevel ? { studentLevel: filters.studentLevel } : {}),
+    ...(filters.participationStatus ? { participationStatus: filters.participationStatus } : {}),
     ...(filters.categoryName ? { categoryName: filters.categoryName.trim() } : {})
   };
+}
+
+function normalizeStringList(values: string[]): string[] {
+  return values.map((value) => value.trim()).filter(Boolean);
 }

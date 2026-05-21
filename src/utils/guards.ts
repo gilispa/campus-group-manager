@@ -30,6 +30,14 @@ export function assertPositiveYear(value: number, field: string): number {
   return value;
 }
 
+export function assertPositiveInteger(value: number, field: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new ValidationError(`${field} debe ser un numero entero positivo.`);
+  }
+
+  return value;
+}
+
 export function assertPasswordStrength(password: string): string {
   if (password.trim().length < 8) {
     throw new ValidationError("La contrasena debe tener al menos 8 caracteres.");

@@ -85,6 +85,33 @@ export class StudentRepository {
     });
   }
 
+  async findFirstDuplicate(
+    filters: { nombre?: string | undefined; matricula?: string | undefined; email?: string | null | undefined },
+    excludeId?: string
+  ): Promise<Student | null> {
+    const or: Prisma.StudentWhereInput[] = [
+      ...(filters.nombre ? [{ nombre: filters.nombre }] : []),
+      ...(filters.matricula ? [{ matricula: filters.matricula }] : []),
+      ...(filters.email ? [{ email: filters.email }] : [])
+    ];
+
+    if (or.length === 0) {
+      return null;
+    }
+
+    return this.prisma.student.findFirst({
+      where: {
+        deletedAt: null,
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
+        OR: or
+      },
+      include: {
+        career: true,
+        prepaProgram: true
+      }
+    });
+  }
+
   async list(): Promise<Student[]> {
     return this.prisma.student.findMany({
       where: { deletedAt: null },
@@ -97,21 +124,33 @@ export class StudentRepository {
   }
 
   async search(filters: StudentSearchFilters): Promise<Student[]> {
+    const roleIds = filters.roleIds?.length ? filters.roleIds : (filters.roleId ? [filters.roleId] : []);
+    const groupIds = filters.groupIds ?? [];
+    const categoryIds = filters.categoryIds ?? [];
+    const shouldFilterMemberships = roleIds.length > 0 || groupIds.length > 0 || categoryIds.length > 0;
+    const groupWhere: Prisma.GroupWhereInput = {
+      deletedAt: null,
+      ...(categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {})
+    };
+    const membershipWhere: Prisma.StudentGroupWhereInput = {
+      ...(filters.participationStatus === "all" ? {} : { active: true }),
+      ...(roleIds.length > 0 ? { roleId: { in: roleIds } } : {}),
+      ...(groupIds.length > 0 ? { groupId: { in: groupIds } } : {}),
+      ...(shouldFilterMemberships ? { group: groupWhere } : {})
+    };
     const where: Prisma.StudentWhereInput = {
       deletedAt: null,
+      ...(filters.studentIds?.length ? { id: { in: filters.studentIds } } : {}),
       ...(filters.nombre ? { nombre: { contains: filters.nombre } } : {}),
       ...(filters.matricula ? { matricula: { contains: filters.matricula } } : {}),
       ...(filters.careerId ? { careerId: filters.careerId } : {}),
       ...(filters.prepaProgramId ? { prepaProgramId: filters.prepaProgramId } : {}),
       ...(filters.generacion !== undefined ? { generacion: filters.generacion } : {}),
       ...(filters.nivel ? { nivel: filters.nivel } : {}),
-      ...(filters.roleId
+      ...(shouldFilterMemberships
         ? {
             memberships: {
-              some: {
-                roleId: filters.roleId,
-                active: true
-              }
+              some: membershipWhere
             }
           }
         : {}),

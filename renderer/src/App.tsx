@@ -18,9 +18,13 @@ import type {
   Career,
   Category,
   Group,
+  GroupExportColumn,
+  GroupSearchFilters,
+  ParticipationExportScope,
   PrepaProgram,
   Role,
   Student,
+  StudentExportColumn,
   StudentLevel
 } from "../../src/types/domain";
 
@@ -48,11 +52,33 @@ type GroupMembership = {
 };
 type AssetMap = Record<string, string>;
 type CatalogType = "category" | "role" | "career" | "program";
+type ExportTarget = "students" | "groups";
 type ConfirmState = {
   title: string;
   message: string;
   confirmLabel: string;
   onConfirm: () => Promise<void>;
+};
+type StudentExportFilterState = {
+  studentIds: string[];
+  nombre: string;
+  matricula: string;
+  generacion: string;
+  nivel: string;
+  careerId: string;
+  prepaProgramId: string;
+  activo: string;
+  groupIds: string[];
+  categoryIds: string[];
+  roleIds: string[];
+  participationStatus: ParticipationExportScope;
+};
+type GroupExportFilterState = {
+  groupIds: string[];
+  categoryIds: string[];
+  roleIds: string[];
+  studentLevel: string;
+  participationStatus: ParticipationExportScope;
 };
 const CATALOG_PAGE_SIZE = 8;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -71,7 +97,60 @@ const emptyStudentSearch = {
   activo: ""
 };
 
-const emptyGroupSearch = { nombre: "", categoryName: "" };
+const emptyGroupSearch = { nombre: "", categoryId: "" };
+
+const studentExportColumnOptions: Array<{ id: StudentExportColumn; label: string }> = [
+  { id: "nombre", label: "Nombre" },
+  { id: "matricula", label: "Matricula" },
+  { id: "nivel", label: "Nivel" },
+  { id: "career", label: "Carrera" },
+  { id: "prepaProgram", label: "Programa prepa" },
+  { id: "generacion", label: "Generacion" },
+  { id: "email", label: "Email" },
+  { id: "telefono", label: "Telefono" },
+  { id: "notas", label: "Notas" },
+  { id: "activo", label: "Activo" },
+  { id: "activeGroups", label: "Grupos activos" },
+  { id: "activeRoles", label: "Roles activos" },
+  { id: "activeGroupCount", label: "Total grupos activos" },
+  { id: "createdAt", label: "Creado" },
+  { id: "updatedAt", label: "Actualizado" }
+];
+const groupExportColumnOptions: Array<{ id: GroupExportColumn; label: string }> = [
+  { id: "nombre", label: "Nombre" },
+  { id: "category", label: "Categoria" },
+  { id: "descripcion", label: "Descripcion" },
+  { id: "activeStudents", label: "Estudiantes activos" },
+  { id: "activeMatriculas", label: "Matriculas activas" },
+  { id: "activeEmails", label: "Correos activos" },
+  { id: "activeRoles", label: "Roles presentes" },
+  { id: "activeStudentCount", label: "Total estudiantes activos" },
+  { id: "createdAt", label: "Creado" },
+  { id: "updatedAt", label: "Actualizado" }
+];
+const defaultStudentExportColumns = studentExportColumnOptions.map((option) => option.id);
+const defaultGroupExportColumns = groupExportColumnOptions.map((option) => option.id);
+const defaultStudentExportFilters: StudentExportFilterState = {
+  studentIds: [],
+  nombre: "",
+  matricula: "",
+  generacion: "",
+  nivel: "",
+  careerId: "",
+  prepaProgramId: "",
+  activo: "",
+  groupIds: [],
+  categoryIds: [],
+  roleIds: [],
+  participationStatus: "active"
+};
+const defaultGroupExportFilters: GroupExportFilterState = {
+  groupIds: [],
+  categoryIds: [],
+  roleIds: [],
+  studentLevel: "",
+  participationStatus: "active"
+};
 
 const defaultStudentForm = {
   nombre: "",
@@ -114,7 +193,9 @@ export function App() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [careers, setCareers] = useState<Career[]>([]);
   const [prepaPrograms, setPrepaPrograms] = useState<PrepaProgram[]>([]);
+  const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [allGroups, setAllGroups] = useState<GroupWithCategory[]>([]);
   const [groups, setGroups] = useState<GroupWithCategory[]>([]);
   const [deletedStudents, setDeletedStudents] = useState<Student[]>([]);
   const [deletedGroups, setDeletedGroups] = useState<GroupWithCategory[]>([]);
@@ -135,6 +216,12 @@ export function App() {
   const [studentSearch, setStudentSearch] = useState(emptyStudentSearch);
   const [groupSearch, setGroupSearch] = useState(emptyGroupSearch);
   const [groupMemberSearch, setGroupMemberSearch] = useState("");
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportTarget, setExportTarget] = useState<ExportTarget>("students");
+  const [studentExportFilters, setStudentExportFilters] = useState<StudentExportFilterState>(defaultStudentExportFilters);
+  const [groupExportFilters, setGroupExportFilters] = useState<GroupExportFilterState>(defaultGroupExportFilters);
+  const [studentExportColumns, setStudentExportColumns] = useState<StudentExportColumn[]>(defaultStudentExportColumns);
+  const [groupExportColumns, setGroupExportColumns] = useState<GroupExportColumn[]>(defaultGroupExportColumns);
 
   const [studentForm, setStudentForm] = useState(defaultStudentForm);
   const [pendingStudentPhotoSource, setPendingStudentPhotoSource] = useState<string | null>(null);
@@ -151,6 +238,12 @@ export function App() {
   const [editingCatalogId, setEditingCatalogId] = useState<string | null>(null);
   const [catalogFormOpen, setCatalogFormOpen] = useState(false);
   const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogType>("category");
+  const [catalogSearchByType, setCatalogSearchByType] = useState<Record<CatalogType, string>>({
+    category: "",
+    role: "",
+    career: "",
+    program: ""
+  });
   const [catalogPageByType, setCatalogPageByType] = useState<Record<CatalogType, number>>({
     category: 1,
     role: 1,
@@ -307,7 +400,9 @@ export function App() {
     setRoles(rolesResult);
     setCareers(careersResult);
     setPrepaPrograms(prepaProgramsResult);
+    setAllStudents(studentsResult);
     setStudents(studentsResult);
+    setAllGroups(groupsResult);
     setGroups(groupsResult);
 
     if (!selectedStudentId || !studentsResult.some((student) => student.id === selectedStudentId)) {
@@ -347,7 +442,9 @@ export function App() {
       await desktopApi.auth.logout();
       setAuthenticated(false);
       setView("dashboard");
+      setAllStudents([]);
       setStudents([]);
+      setAllGroups([]);
       setGroups([]);
       setStudentMembershipIndex({});
       setAssetUrls({});
@@ -390,7 +487,7 @@ export function App() {
   function buildGroupFilters() {
     return {
       ...(groupSearch.nombre ? { nombre: groupSearch.nombre } : {}),
-      ...(groupSearch.categoryName ? { categoryName: groupSearch.categoryName } : {})
+      ...(groupSearch.categoryId ? { categoryId: groupSearch.categoryId } : {})
     };
   }
 
@@ -723,22 +820,86 @@ export function App() {
     });
   }
 
-  async function exportStudentsCsv() {
-    await withAction(async () => {
-      const result = await desktopApi.students.exportCsv(buildStudentFilters());
-      if (result) {
-        setNotice(`Estudiantes exportados a ${result}`);
-      }
-    }, undefined, "Exportando estudiantes...");
+  function openExportModal(target: ExportTarget) {
+    setExportTarget(target);
+    if (target === "students") {
+      setStudentExportFilters({
+        ...defaultStudentExportFilters,
+        nombre: studentSearch.nombre,
+        matricula: studentSearch.matricula,
+        generacion: studentSearch.generacion,
+        nivel: studentSearch.nivel,
+        careerId: studentSearch.careerId,
+        prepaProgramId: studentSearch.prepaProgramId,
+        activo: studentSearch.activo,
+        roleIds: studentSearch.roleId ? [studentSearch.roleId] : []
+      });
+    } else {
+      setGroupExportFilters({
+        ...defaultGroupExportFilters,
+        categoryIds: groupSearch.categoryId ? [groupSearch.categoryId] : []
+      });
+    }
+    setExportModalOpen(true);
   }
 
-  async function exportGroupsCsv() {
+  function buildStudentExportFilters() {
+    return {
+      ...(studentExportFilters.studentIds.length ? { studentIds: studentExportFilters.studentIds } : {}),
+      ...(studentExportFilters.nombre ? { nombre: studentExportFilters.nombre } : {}),
+      ...(studentExportFilters.matricula ? { matricula: studentExportFilters.matricula } : {}),
+      ...(studentExportFilters.generacion ? { generacion: Number(studentExportFilters.generacion) } : {}),
+      ...(studentExportFilters.nivel ? { nivel: studentExportFilters.nivel as StudentLevel } : {}),
+      ...(studentExportFilters.careerId ? { careerId: studentExportFilters.careerId } : {}),
+      ...(studentExportFilters.prepaProgramId ? { prepaProgramId: studentExportFilters.prepaProgramId } : {}),
+      ...(studentExportFilters.activo === "true" ? { activo: true } : {}),
+      ...(studentExportFilters.activo === "false" ? { activo: false } : {}),
+      ...(studentExportFilters.groupIds.length ? { groupIds: studentExportFilters.groupIds } : {}),
+      ...(studentExportFilters.categoryIds.length ? { categoryIds: studentExportFilters.categoryIds } : {}),
+      ...(studentExportFilters.roleIds.length ? { roleIds: studentExportFilters.roleIds } : {}),
+      participationStatus: studentExportFilters.participationStatus
+    };
+  }
+
+  function buildGroupExportFilters(): GroupSearchFilters {
+    return {
+      ...(groupExportFilters.groupIds.length ? { groupIds: groupExportFilters.groupIds } : {}),
+      ...(groupExportFilters.categoryIds.length ? { categoryIds: groupExportFilters.categoryIds } : {}),
+      ...(groupExportFilters.roleIds.length ? { roleIds: groupExportFilters.roleIds } : {}),
+      ...(groupExportFilters.studentLevel ? { studentLevel: groupExportFilters.studentLevel as StudentLevel } : {}),
+      participationStatus: groupExportFilters.participationStatus
+    };
+  }
+
+  async function runConfiguredCsvExport() {
     await withAction(async () => {
-      const result = await desktopApi.groups.exportCsv(buildGroupFilters());
+      if (exportTarget === "students") {
+        if (studentExportColumns.length === 0) {
+          throw new Error("Selecciona al menos una columna para exportar estudiantes.");
+        }
+        const result = await desktopApi.students.exportCsv({
+          filters: buildStudentExportFilters(),
+          columns: studentExportColumns
+        });
+        if (result) {
+          setExportModalOpen(false);
+          setNotice(`Estudiantes exportados a ${result}`);
+        }
+        return;
+      }
+
+      if (groupExportColumns.length === 0) {
+        throw new Error("Selecciona al menos una columna para exportar grupos.");
+      }
+      const result = await desktopApi.groups.exportCsv({
+        filters: buildGroupExportFilters(),
+        columns: groupExportColumns
+      });
       if (result) {
+        setExportModalOpen(false);
         setNotice(`Grupos exportados a ${result}`);
       }
-    }, undefined, "Exportando grupos...");
+    }, undefined, exportTarget === "students" ? "Exportando estudiantes..." : "Exportando grupos...");
   }
 
   async function loadTrash() {
@@ -957,13 +1118,35 @@ export function App() {
     .filter((membership) => membership.active)
     .filter((membership) => matchesMembershipSearch(membership, normalizedGroupMemberSearch));
   const filteredGroupHistory = groupMemberships.filter((membership) => matchesMembershipSearch(membership, normalizedGroupMemberSearch));
+  const groupSelectOptions = allGroups.map((group) => ({
+    value: group.id,
+    label: group.nombre
+  }));
+  const categorySelectOptions = categories.map((category) => ({
+    value: category.id,
+    label: category.name
+  }));
+  const roleSelectOptions = roles.map((role) => ({
+    value: role.id,
+    label: role.name
+  }));
+  const studentSelectOptions = allStudents.map((student) => ({
+    value: student.id,
+    label: `${student.nombre} - ${student.matricula}`
+  }));
   const catalogItemsByType: Record<CatalogType, Array<{ id: string; name: string; description?: string | null }>> = {
     category: categories,
     role: roles,
     career: careers,
     program: prepaPrograms
   };
-  const activeCatalogItems = catalogItemsByType[activeCatalogTab];
+  const activeCatalogSearch = catalogSearchByType[activeCatalogTab].trim().toLowerCase();
+  const activeCatalogItems = activeCatalogSearch
+    ? catalogItemsByType[activeCatalogTab].filter((item) => [
+        item.name,
+        item.description ?? ""
+      ].join(" ").toLowerCase().includes(activeCatalogSearch))
+    : catalogItemsByType[activeCatalogTab];
   const activeCatalogPage = Math.min(
     catalogPageByType[activeCatalogTab] ?? 1,
     Math.max(1, Math.ceil(activeCatalogItems.length / CATALOG_PAGE_SIZE))
@@ -1042,7 +1225,7 @@ export function App() {
         </header>
 
         {view === "dashboard" ? (
-          <section className="grid two-columns">
+          <section className="grid two-columns dashboard-grid">
             <div className="card stats-grid">
               <StatCard label="Estudiantes" value={summary?.students ?? 0} />
               <StatCard label="Grupos" value={summary?.groups ?? 0} />
@@ -1066,7 +1249,7 @@ export function App() {
             <div className="search-bar-horizontal student-search-bar">
               <input className="student-filter-name" value={studentSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, nombre: event.target.value })} placeholder="Nombre" />
               <input className="student-filter-matricula" value={studentSearch.matricula} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, matricula: event.target.value })} placeholder="Matricula" />
-              <input className="student-filter-generacion" value={studentSearch.generacion} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, generacion: event.target.value })} placeholder="Generacion" />
+              <input className="student-filter-generacion" type="number" min="1" step="1" value={studentSearch.generacion} onKeyDown={(event) => handleSearchKeyDown(event, () => searchStudents())} onChange={(event) => setStudentSearch({ ...studentSearch, generacion: event.target.value })} placeholder="Generacion" />
               <SelectField shellClassName="student-filter-level" value={studentSearch.nivel} onChange={(event) => setStudentSearch({ ...studentSearch, nivel: event.target.value })}>
                 <option value="">Todos los niveles</option>
                 <option value="PROFESIONAL">PROFESIONAL</option>
@@ -1098,7 +1281,7 @@ export function App() {
               <div className="search-actions student-search-actions">
                 <button onClick={() => void searchStudents()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setStudentSearch(emptyStudentSearch); void refreshData(); }}>Limpiar</button>
-                <button className="ghost-button" onClick={() => void exportStudentsCsv()}>Exportar CSV</button>
+                <button className="ghost-button" onClick={() => openExportModal("students")}>Exportar CSV</button>
                 <button onClick={openCreateStudentModal}>Nuevo estudiante</button>
               </div>
             </div>
@@ -1156,11 +1339,16 @@ export function App() {
           <section className="stack-gap">
             <div className="search-bar-horizontal">
               <input value={groupSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchGroups())} onChange={(event) => setGroupSearch({ ...groupSearch, nombre: event.target.value })} placeholder="Nombre de grupo" />
-              <input value={groupSearch.categoryName} onKeyDown={(event) => handleSearchKeyDown(event, () => searchGroups())} onChange={(event) => setGroupSearch({ ...groupSearch, categoryName: event.target.value })} placeholder="Categoria" />
+              <SelectField value={groupSearch.categoryId} onChange={(event) => setGroupSearch({ ...groupSearch, categoryId: event.target.value })}>
+                <option value="">Todas las categorias</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </SelectField>
               <div className="search-actions">
                 <button onClick={() => void searchGroups()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setGroupSearch(emptyGroupSearch); void refreshData(); }}>Limpiar</button>
-                <button className="ghost-button" onClick={() => void exportGroupsCsv()}>Exportar CSV</button>
+                <button className="ghost-button" onClick={() => openExportModal("groups")}>Exportar CSV</button>
                 <button onClick={openCreateGroupModal}>Nuevo grupo</button>
               </div>
             </div>
@@ -1205,6 +1393,26 @@ export function App() {
                   {getCatalogSectionTitle(tab)}
                 </button>
               ))}
+            </div>
+
+            <div className="search-bar-horizontal catalog-search-bar">
+              <input
+                value={catalogSearchByType[activeCatalogTab]}
+                onChange={(event) => {
+                  setCatalogSearchByType({ ...catalogSearchByType, [activeCatalogTab]: event.target.value });
+                  setCatalogPageByType({ ...catalogPageByType, [activeCatalogTab]: 1 });
+                }}
+                placeholder={`Buscar en ${getCatalogSectionTitle(activeCatalogTab).toLowerCase()}`}
+              />
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setCatalogSearchByType({ ...catalogSearchByType, [activeCatalogTab]: "" });
+                  setCatalogPageByType({ ...catalogPageByType, [activeCatalogTab]: 1 });
+                }}
+              >
+                Limpiar
+              </button>
             </div>
 
             <CatalogSection
@@ -1276,7 +1484,7 @@ export function App() {
               <option value="PROFESIONAL">PROFESIONAL</option>
               <option value="PREPA">PREPA</option>
             </SelectField>
-            <input value={studentForm.generacion} onChange={(event) => setStudentForm({ ...studentForm, generacion: event.target.value })} placeholder="Generacion" />
+            <input type="number" min="1" step="1" value={studentForm.generacion} onChange={(event) => setStudentForm({ ...studentForm, generacion: event.target.value })} placeholder="Generacion" />
             {studentForm.nivel === "PROFESIONAL" ? (
               <SelectField value={studentForm.careerId} onChange={(event) => setStudentForm({ ...studentForm, careerId: event.target.value })}>
                 <option value="">Selecciona carrera</option>
@@ -1455,7 +1663,7 @@ export function App() {
               <h4>Nueva participacion</h4>
               <SelectField value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
                 <option value="">Selecciona estudiante</option>
-                {students.map((student) => (
+                {allStudents.map((student) => (
                   <option key={student.id} value={student.id}>{student.nombre} - {student.matricula}</option>
                 ))}
               </SelectField>
@@ -1518,6 +1726,142 @@ export function App() {
               ])}
             />
           ) : null}
+        </Modal>
+      ) : null}
+
+      {exportModalOpen ? (
+        <Modal title="Exportar CSV" onClose={() => setExportModalOpen(false)}>
+          <div className="catalog-nav export-tabs">
+            <button className={exportTarget === "students" ? "catalog-tab active" : "catalog-tab"} onClick={() => setExportTarget("students")}>
+              Estudiantes
+            </button>
+            <button className={exportTarget === "groups" ? "catalog-tab active" : "catalog-tab"} onClick={() => setExportTarget("groups")}>
+              Grupos
+            </button>
+          </div>
+
+          {exportTarget === "students" ? (
+            <div className="form-stack">
+              <div className="export-filter-grid">
+                <MultiSelectField
+                  label="Estudiantes"
+                  options={studentSelectOptions}
+                  selectedValues={studentExportFilters.studentIds}
+                  onChange={(studentIds) => setStudentExportFilters({ ...studentExportFilters, studentIds })}
+                />
+                <input type="number" min="1" step="1" value={studentExportFilters.generacion} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, generacion: event.target.value })} placeholder="Generacion" />
+                <SelectField value={studentExportFilters.nivel} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, nivel: event.target.value })}>
+                  <option value="">Todos los niveles</option>
+                  <option value="PROFESIONAL">PROFESIONAL</option>
+                  <option value="PREPA">PREPA</option>
+                </SelectField>
+                <SelectField value={studentExportFilters.careerId} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, careerId: event.target.value })}>
+                  <option value="">Todas las carreras</option>
+                  {careers.map((career) => (
+                    <option key={career.id} value={career.id}>{career.name}</option>
+                  ))}
+                </SelectField>
+                <SelectField value={studentExportFilters.prepaProgramId} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, prepaProgramId: event.target.value })}>
+                  <option value="">Todos los programas</option>
+                  {prepaPrograms.map((program) => (
+                    <option key={program.id} value={program.id}>{program.name}</option>
+                  ))}
+                </SelectField>
+                <SelectField value={studentExportFilters.activo} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, activo: event.target.value })}>
+                  <option value="">Activos e inactivos</option>
+                  <option value="true">Solo activos</option>
+                  <option value="false">Solo inactivos</option>
+                </SelectField>
+                <SelectField value={studentExportFilters.participationStatus} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, participationStatus: event.target.value as ParticipationExportScope })}>
+                  <option value="active">Participaciones activas</option>
+                  <option value="all">Todo el historial</option>
+                </SelectField>
+                <MultiSelectField
+                  label="Grupos"
+                  options={groupSelectOptions}
+                  selectedValues={studentExportFilters.groupIds}
+                  onChange={(groupIds) => setStudentExportFilters({ ...studentExportFilters, groupIds })}
+                />
+                <MultiSelectField
+                  label="Categorias"
+                  options={categorySelectOptions}
+                  selectedValues={studentExportFilters.categoryIds}
+                  onChange={(categoryIds) => setStudentExportFilters({ ...studentExportFilters, categoryIds })}
+                />
+                <MultiSelectField
+                  label="Roles"
+                  options={roleSelectOptions}
+                  selectedValues={studentExportFilters.roleIds}
+                  onChange={(roleIds) => setStudentExportFilters({ ...studentExportFilters, roleIds })}
+                />
+              </div>
+              <ExportColumnSelector
+                title="Campos de estudiantes"
+                options={studentExportColumnOptions}
+                selectedValues={studentExportColumns}
+                defaultValues={defaultStudentExportColumns}
+                onChange={(columns) => setStudentExportColumns(columns as StudentExportColumn[])}
+              />
+            </div>
+          ) : (
+            <div className="form-stack">
+              <div className="export-filter-grid">
+                <SelectField value={groupExportFilters.studentLevel} onChange={(event) => setGroupExportFilters({ ...groupExportFilters, studentLevel: event.target.value })}>
+                  <option value="">Todos los niveles</option>
+                  <option value="PROFESIONAL">PROFESIONAL</option>
+                  <option value="PREPA">PREPA</option>
+                </SelectField>
+                <SelectField value={groupExportFilters.participationStatus} onChange={(event) => setGroupExportFilters({ ...groupExportFilters, participationStatus: event.target.value as ParticipationExportScope })}>
+                  <option value="active">Participaciones activas</option>
+                  <option value="all">Todo el historial</option>
+                </SelectField>
+                <MultiSelectField
+                  label="Grupos"
+                  options={groupSelectOptions}
+                  selectedValues={groupExportFilters.groupIds}
+                  onChange={(groupIds) => setGroupExportFilters({ ...groupExportFilters, groupIds })}
+                />
+                <MultiSelectField
+                  label="Categorias"
+                  options={categorySelectOptions}
+                  selectedValues={groupExportFilters.categoryIds}
+                  onChange={(categoryIds) => setGroupExportFilters({ ...groupExportFilters, categoryIds })}
+                />
+                <MultiSelectField
+                  label="Roles"
+                  options={roleSelectOptions}
+                  selectedValues={groupExportFilters.roleIds}
+                  onChange={(roleIds) => setGroupExportFilters({ ...groupExportFilters, roleIds })}
+                />
+              </div>
+              <ExportColumnSelector
+                title="Campos de grupos"
+                options={groupExportColumnOptions}
+                selectedValues={groupExportColumns}
+                defaultValues={defaultGroupExportColumns}
+                onChange={(columns) => setGroupExportColumns(columns as GroupExportColumn[])}
+              />
+            </div>
+          )}
+
+          <div className="row-actions">
+            <button onClick={() => void runConfiguredCsvExport()}>Exportar CSV</button>
+            <button
+              className="ghost-button"
+              onClick={() => {
+                if (exportTarget === "students") {
+                  setStudentExportFilters(defaultStudentExportFilters);
+                  setStudentExportColumns(defaultStudentExportColumns);
+                } else {
+                  setGroupExportFilters(defaultGroupExportFilters);
+                  setGroupExportColumns(defaultGroupExportColumns);
+                }
+              }}
+            >
+              Restaurar predeterminado
+            </button>
+            <button className="ghost-button" onClick={() => setExportModalOpen(false)}>Cancelar</button>
+          </div>
         </Modal>
       ) : null}
 
@@ -1638,10 +1982,11 @@ function ImagePickerCard(props: {
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
-        const droppedSource = extractDroppedSourcePath(event);
-        if (droppedSource) {
-          props.onDropSource(droppedSource);
-        }
+        void extractDroppedSourcePath(event).then((droppedSource) => {
+          if (droppedSource) {
+            props.onDropSource(droppedSource);
+          }
+        });
       }}
     >
       <div>
@@ -1706,8 +2051,17 @@ function SelectField({
   ...props
 }: SelectHTMLAttributes<HTMLSelectElement> & { children: ReactNode; compact?: boolean; shellClassName?: string }) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
   const options = useMemo(() => getSelectOptions(children), [children]);
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return options;
+    }
+
+    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+  }, [options, query]);
   const selectedValue = value == null ? "" : String(value);
   const selectedOption = options.find((option) => option.value === selectedValue) ?? null;
   const selectedLabel = selectedOption?.label ?? "";
@@ -1719,6 +2073,7 @@ function SelectField({
 
   useEffect(() => {
     if (!open) {
+      setQuery("");
       return;
     }
 
@@ -1777,19 +2132,23 @@ function SelectField({
 
       {open ? (
         <div className="select-menu" role="listbox">
-          {options.map((option) => (
-            <button
-              key={option.value || "__empty__"}
-              type="button"
-              role="option"
-              className={option.value === selectedValue ? "select-option selected" : "select-option"}
-              aria-selected={option.value === selectedValue}
-              onClick={() => handleSelect(option.value)}
-              title={option.label}
-            >
-              <span className="select-option-label">{option.label}</span>
-            </button>
-          ))}
+          <input className="select-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar opcion" autoFocus />
+          <div className="select-menu-options">
+            {filteredOptions.length === 0 ? <span className="select-empty muted">Sin resultados</span> : null}
+            {filteredOptions.map((option) => (
+              <button
+                key={option.value || "__empty__"}
+                type="button"
+                role="option"
+                className={option.value === selectedValue ? "select-option selected" : "select-option"}
+                aria-selected={option.value === selectedValue}
+                onClick={() => handleSelect(option.value)}
+                title={option.label}
+              >
+                <span className="select-option-label">{option.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -1804,6 +2163,126 @@ function SelectField({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+function MultiSelectField(props: {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedSet = useMemo(() => new Set(props.selectedValues), [props.selectedValues]);
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) {
+      return props.options;
+    }
+
+    return props.options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+  }, [props.options, query]);
+  const summary = props.selectedValues.length === 0
+    ? props.label
+    : `${props.label}: ${props.selectedValues.length}`;
+
+  useEffect(() => {
+    if (!open) {
+      setQuery("");
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("mousedown", handlePointerDown);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handlePointerDown);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [open]);
+
+  function toggleValue(value: string) {
+    if (selectedSet.has(value)) {
+      props.onChange(props.selectedValues.filter((selectedValue) => selectedValue !== value));
+      return;
+    }
+
+    props.onChange([...props.selectedValues, value]);
+  }
+
+  return (
+    <div className="select-shell" ref={containerRef}>
+      <button type="button" className="select-trigger" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
+        <span className={props.selectedValues.length ? "select-trigger-label" : "select-trigger-label muted"}>{summary}</span>
+        <span className={open ? "select-caret open" : "select-caret"} aria-hidden="true" />
+      </button>
+      {open ? (
+        <div className="select-menu multi-select-menu" role="listbox">
+          <input className="select-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Buscar ${props.label.toLowerCase()}`} autoFocus />
+          <div className="select-menu-options">
+            {filteredOptions.length === 0 ? <span className="select-empty muted">Sin resultados</span> : null}
+            {filteredOptions.map((option) => (
+              <label key={option.value} className="multi-select-option">
+                <input type="checkbox" checked={selectedSet.has(option.value)} onChange={() => toggleValue(option.value)} />
+                <span className="select-option-label">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ExportColumnSelector(props: {
+  title: string;
+  options: Array<{ id: string; label: string }>;
+  selectedValues: string[];
+  defaultValues: string[];
+  onChange: (values: string[]) => void;
+}) {
+  const selectedSet = useMemo(() => new Set(props.selectedValues), [props.selectedValues]);
+
+  function toggleColumn(column: string) {
+    if (selectedSet.has(column)) {
+      props.onChange(props.selectedValues.filter((selectedValue) => selectedValue !== column));
+      return;
+    }
+
+    props.onChange([...props.selectedValues, column]);
+  }
+
+  return (
+    <div className="card form-stack form-card-embedded export-columns-card">
+      <div className="section-head">
+        <h4>{props.title}</h4>
+        <div className="inline-actions">
+          <button className="small-button ghost-button" onClick={() => props.onChange(props.options.map((option) => option.id))}>Seleccionar todo</button>
+          <button className="small-button ghost-button" onClick={() => props.onChange(props.defaultValues)}>Restaurar</button>
+        </div>
+      </div>
+      <div className="export-columns-grid">
+        {props.options.map((option) => (
+          <label key={option.id} className="checkbox-card">
+            <input type="checkbox" checked={selectedSet.has(option.id)} onChange={() => toggleColumn(option.id)} />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { uploadPrefixes } from "../config/paths";
 import { StudentLevel } from "../types/domain";
 import type { StudentCreateInput, StudentSearchFilters, StudentUpdateInput, StudentLevel as StudentLevelType } from "../types/domain";
-import { assertLocalUploadPath, assertNonEmptyString, assertOptionalString, assertPositiveYear } from "../utils/guards";
+import { assertLocalUploadPath, assertNonEmptyString, assertOptionalString, assertPositiveInteger } from "../utils/guards";
 import { ValidationError } from "../utils/errors";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,7 +47,7 @@ function normalizeAcademicLinks(
 export function validateStudentCreate(input: StudentCreateInput): StudentCreateInput {
   const nombre = assertNonEmptyString(input.nombre, "El nombre");
   const matricula = assertNonEmptyString(input.matricula, "La matricula");
-  const generacion = assertPositiveYear(input.generacion, "La generacion");
+  const generacion = assertPositiveInteger(input.generacion, "La generacion");
   const academicLinks = normalizeAcademicLinks(input.nivel, input.careerId, input.prepaProgramId);
   const foto = assertLocalUploadPath(input.foto, uploadPrefixes.students, "La foto");
 
@@ -77,7 +77,7 @@ export function validateStudentUpdate(
     ...input,
     ...(input.nombre !== undefined ? { nombre: assertNonEmptyString(input.nombre, "El nombre") } : {}),
     ...(input.matricula !== undefined ? { matricula: assertNonEmptyString(input.matricula, "La matricula") } : {}),
-    ...(input.generacion !== undefined ? { generacion: assertPositiveYear(input.generacion, "La generacion") } : {}),
+    ...(input.generacion !== undefined ? { generacion: assertPositiveInteger(input.generacion, "La generacion") } : {}),
     ...(input.foto !== undefined
       ? { foto: assertLocalUploadPath(input.foto, uploadPrefixes.students, "La foto") }
       : {}),
@@ -90,13 +90,22 @@ export function validateStudentUpdate(
 
 export function validateStudentSearchFilters(filters: StudentSearchFilters): StudentSearchFilters {
   return {
+    ...(filters.studentIds ? { studentIds: normalizeStringList(filters.studentIds) } : {}),
     ...(filters.nombre ? { nombre: filters.nombre.trim() } : {}),
     ...(filters.matricula ? { matricula: filters.matricula.trim() } : {}),
     ...(filters.careerId ? { careerId: filters.careerId.trim() } : {}),
     ...(filters.prepaProgramId ? { prepaProgramId: filters.prepaProgramId.trim() } : {}),
-    ...(filters.generacion !== undefined ? { generacion: assertPositiveYear(filters.generacion, "La generacion") } : {}),
+    ...(filters.generacion !== undefined ? { generacion: assertPositiveInteger(filters.generacion, "La generacion") } : {}),
     ...(filters.nivel ? { nivel: filters.nivel } : {}),
     ...(filters.roleId ? { roleId: filters.roleId.trim() } : {}),
+    ...(filters.roleIds ? { roleIds: normalizeStringList(filters.roleIds) } : {}),
+    ...(filters.groupIds ? { groupIds: normalizeStringList(filters.groupIds) } : {}),
+    ...(filters.categoryIds ? { categoryIds: normalizeStringList(filters.categoryIds) } : {}),
+    ...(filters.participationStatus ? { participationStatus: filters.participationStatus } : {}),
     ...(filters.activo !== undefined ? { activo: filters.activo } : {})
   };
+}
+
+function normalizeStringList(values: string[]): string[] {
+  return values.map((value) => value.trim()).filter(Boolean);
 }

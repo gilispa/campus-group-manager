@@ -20,6 +20,7 @@ export class StudentService {
   async createStudent(input: StudentCreateInput) {
     const data = validateStudentCreate(input);
     await this.ensureAcademicLinksExist(data);
+    await this.ensureUniqueStudentFields(data);
 
     try {
       return await this.repository.create(data);
@@ -36,6 +37,7 @@ export class StudentService {
     const current = await this.ensureStudentExists(id);
     const data = validateStudentUpdate(current, input);
     await this.ensureAcademicLinksExist(data);
+    await this.ensureUniqueStudentFields(this.getChangedUniqueStudentFields(current, data), id);
 
     try {
       return await this.repository.update(id, data);
@@ -126,6 +128,44 @@ export class StudentService {
     }
 
     return student;
+  }
+
+  private async ensureUniqueStudentFields(
+    input: { nombre?: string | undefined; matricula?: string | undefined; email?: string | null | undefined },
+    excludeId?: string
+  ) {
+    const duplicate = await this.repository.findFirstDuplicate({
+      nombre: input.nombre,
+      matricula: input.matricula,
+      email: input.email
+    }, excludeId);
+
+    if (!duplicate) {
+      return;
+    }
+
+    if (input.matricula && duplicate.matricula === input.matricula) {
+      throw new ConflictError("Ya existe un estudiante con esa matricula.");
+    }
+
+    if (input.email && duplicate.email === input.email) {
+      throw new ConflictError("Ya existe un estudiante con ese correo.");
+    }
+
+    if (input.nombre && duplicate.nombre === input.nombre) {
+      throw new ConflictError("Ya existe un estudiante con ese nombre.");
+    }
+  }
+
+  private getChangedUniqueStudentFields(
+    current: { nombre: string; matricula: string; email: string | null },
+    next: { nombre?: string | undefined; matricula?: string | undefined; email?: string | null | undefined }
+  ) {
+    return {
+      ...(next.nombre !== undefined && next.nombre !== current.nombre ? { nombre: next.nombre } : {}),
+      ...(next.matricula !== undefined && next.matricula !== current.matricula ? { matricula: next.matricula } : {}),
+      ...(next.email !== undefined && next.email !== current.email ? { email: next.email } : {})
+    };
   }
 
   private async ensureAcademicLinksExist(input: Pick<StudentCreateInput, "careerId" | "prepaProgramId">) {

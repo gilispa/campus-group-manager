@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { DesktopApi, IpcChannel, IpcChannelMap } from "../types/ipc";
 
 function invoke<K extends IpcChannel>(channel: K, input: IpcChannelMap[K]["input"]) {
@@ -64,7 +64,7 @@ const desktopApi: DesktopApi = {
     list: () => invoke("students:list", undefined),
     listDeleted: () => invoke("students:listDeleted", undefined),
     search: (filters) => invoke("students:search", filters),
-    exportCsv: (filters) => invoke("students:exportCsv", filters),
+    exportCsv: (input) => invoke("students:exportCsv", input),
     pickPhoto: () => invoke("students:pickPhoto", undefined),
     savePhoto: (sourcePath, currentPhoto) =>
       invoke("students:savePhoto", {
@@ -82,7 +82,7 @@ const desktopApi: DesktopApi = {
     list: () => invoke("groups:list", undefined),
     listDeleted: () => invoke("groups:listDeleted", undefined),
     search: (filters) => invoke("groups:search", filters),
-    exportCsv: (filters) => invoke("groups:exportCsv", filters),
+    exportCsv: (input) => invoke("groups:exportCsv", input),
     pickLogo: () => invoke("groups:pickLogo", undefined),
     saveLogo: (sourcePath, currentLogo) =>
       invoke("groups:saveLogo", {
@@ -109,7 +109,8 @@ const desktopApi: DesktopApi = {
   meta: {
     getSummary: () => invoke("meta:summary", undefined),
     resolveAssetUrl: (assetPath) => invoke("meta:resolveAssetUrl", { assetPath }),
-    resolveDroppedPath: (candidatePath, kind) => invoke("meta:resolveDroppedPath", { candidatePath, kind })
+    resolveDroppedPath: (candidatePath, kind) => invoke("meta:resolveDroppedPath", { candidatePath, kind }),
+    getPathForFile: (file) => webUtils.getPathForFile(file as File)
   }
 };
 
