@@ -65,6 +65,8 @@ const desktopApi: DesktopApi = {
     listDeleted: () => invoke("students:listDeleted", undefined),
     search: (filters) => invoke("students:search", filters),
     exportCsv: (input) => invoke("students:exportCsv", input),
+    exportTemplateCsv: () => invoke("students:exportTemplateCsv", undefined),
+    importCsv: () => invoke("students:importCsv", undefined),
     pickPhoto: () => invoke("students:pickPhoto", undefined),
     savePhoto: (sourcePath, currentPhoto) =>
       invoke("students:savePhoto", {
@@ -83,6 +85,8 @@ const desktopApi: DesktopApi = {
     listDeleted: () => invoke("groups:listDeleted", undefined),
     search: (filters) => invoke("groups:search", filters),
     exportCsv: (input) => invoke("groups:exportCsv", input),
+    exportTemplateCsv: () => invoke("groups:exportTemplateCsv", undefined),
+    importCsv: () => invoke("groups:importCsv", undefined),
     pickLogo: () => invoke("groups:pickLogo", undefined),
     saveLogo: (sourcePath, currentLogo) =>
       invoke("groups:saveLogo", {

@@ -70,6 +70,8 @@ const groupExportLabels: Record<GroupExportColumn, string> = {
   createdAt: "Creado",
   updatedAt: "Actualizado"
 };
+const studentImportHeaders = ["Nombre", "Matricula", "Nivel", "Carrera", "Programa prepa", "Generacion", "Email", "Telefono", "Notas", "Activo"];
+const groupImportHeaders = ["Nombre", "Categoria", "Descripcion"];
 
 export function registerIpcHandlers(): void {
   const services = createBackendServices();
@@ -184,6 +186,58 @@ export function registerIpcHandlers(): void {
         })
       ]);
     },
+    "students:exportTemplateCsv": async () => exportCsv("plantilla-estudiantes.csv", [studentImportHeaders]),
+    "students:importCsv": async () => {
+      const filePath = await pickCsvImportFile();
+      if (!filePath) {
+        return { created: 0, failed: 0, errors: [] };
+      }
+
+      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      const careers = await services.careerService.listCareers();
+      const programs = await services.prepaProgramService.listPrepaPrograms();
+      const careerByName = createNameLookup(careers);
+      const programByName = createNameLookup(programs);
+      const result = { created: 0, failed: 0, errors: [] as string[] };
+
+      for (const [index, row] of rows.entries()) {
+        const lineNumber = index + 2;
+        try {
+          const nivel = normalizeLevel(getCsvValue(row, "Nivel"));
+          const careerName = getCsvValue(row, "Carrera");
+          const programName = getCsvValue(row, "Programa prepa");
+          const career = careerName ? careerByName.get(normalizeLookupKey(careerName)) : null;
+          const program = programName ? programByName.get(normalizeLookupKey(programName)) : null;
+
+          if (nivel === "PROFESIONAL" && !career) {
+            throw new Error(`La carrera "${careerName}" no existe.`);
+          }
+
+          if (nivel === "PREPA" && !program) {
+            throw new Error(`El programa prepa "${programName}" no existe.`);
+          }
+
+          await services.studentService.createStudent({
+            nombre: getCsvValue(row, "Nombre"),
+            matricula: getCsvValue(row, "Matricula"),
+            nivel,
+            careerId: nivel === "PROFESIONAL" ? career?.id : null,
+            prepaProgramId: nivel === "PREPA" ? program?.id : null,
+            generacion: parsePositiveInteger(getCsvValue(row, "Generacion"), "Generacion"),
+            email: optionalCsvValue(row, "Email"),
+            telefono: optionalCsvValue(row, "Telefono"),
+            notas: optionalCsvValue(row, "Notas"),
+            activo: parseOptionalBoolean(getCsvValue(row, "Activo")) ?? true
+          });
+          result.created += 1;
+        } catch (error) {
+          result.failed += 1;
+          result.errors.push(`Fila ${lineNumber}: ${getErrorMessage(error)}`);
+        }
+      }
+
+      return result;
+    },
     "students:pickPhoto": async () => {
       const result = await dialog.showOpenDialog({
         properties: ["openFile"],
@@ -230,6 +284,41 @@ export function registerIpcHandlers(): void {
           return columns.map((column) => values[column]);
         }))
       ]);
+    },
+    "groups:exportTemplateCsv": async () => exportCsv("plantilla-grupos.csv", [groupImportHeaders]),
+    "groups:importCsv": async () => {
+      const filePath = await pickCsvImportFile();
+      if (!filePath) {
+        return { created: 0, failed: 0, errors: [] };
+      }
+
+      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      const categories = await services.categoryService.listCategories();
+      const categoryByName = createNameLookup(categories);
+      const result = { created: 0, failed: 0, errors: [] as string[] };
+
+      for (const [index, row] of rows.entries()) {
+        const lineNumber = index + 2;
+        try {
+          const categoryName = getCsvValue(row, "Categoria");
+          const category = categoryByName.get(normalizeLookupKey(categoryName));
+          if (!category) {
+            throw new Error(`La categoria "${categoryName}" no existe.`);
+          }
+
+          await services.groupService.createGroup({
+            nombre: getCsvValue(row, "Nombre"),
+            categoryId: category.id,
+            descripcion: optionalCsvValue(row, "Descripcion")
+          });
+          result.created += 1;
+        } catch (error) {
+          result.failed += 1;
+          result.errors.push(`Fila ${lineNumber}: ${getErrorMessage(error)}`);
+        }
+      }
+
+      return result;
     },
     "groups:pickLogo": async () => {
       const result = await dialog.showOpenDialog({
@@ -333,6 +422,138 @@ function selectExportColumns<T extends string>(
   const allowed = new Set(Object.keys(labels));
   const columns = requested.filter((column) => allowed.has(column));
   return columns.length > 0 ? columns : fallback;
+}
+
+async function pickCsvImportFile(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "CSV", extensions: ["csv"] }]
+  });
+
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
+function parseCsv(content: string): Array<Record<string, string>> {
+  const rows: string[][] = [];
+  let currentCell = "";
+  let currentRow: string[] = [];
+  let inQuotes = false;
+  const normalizedContent = content.replace(/^\uFEFF/, "");
+
+  for (let index = 0; index < normalizedContent.length; index += 1) {
+    const char = normalizedContent[index];
+    const nextChar = normalizedContent[index + 1];
+
+    if (char === "\"") {
+      if (inQuotes && nextChar === "\"") {
+        currentCell += "\"";
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      currentRow.push(currentCell);
+      currentCell = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && nextChar === "\n") {
+        index += 1;
+      }
+      currentRow.push(currentCell);
+      rows.push(currentRow);
+      currentCell = "";
+      currentRow = [];
+      continue;
+    }
+
+    currentCell += char;
+  }
+
+  currentRow.push(currentCell);
+  rows.push(currentRow);
+
+  const [headers = [], ...bodyRows] = rows;
+  const normalizedHeaders = headers.map((header) => normalizeHeader(header));
+  return bodyRows
+    .filter((row) => row.some((cell) => cell.trim()))
+    .map((row) => Object.fromEntries(normalizedHeaders.map((header, index) => [header, row[index]?.trim() ?? ""])));
+}
+
+function getCsvValue(row: Record<string, string>, header: string): string {
+  return row[normalizeHeader(header)] ?? "";
+}
+
+function optionalCsvValue(row: Record<string, string>, header: string): string | null {
+  const value = getCsvValue(row, header).trim();
+  return value || null;
+}
+
+function normalizeHeader(value: string): string {
+  return normalizeLookupKey(value).replace(/\s+/g, "");
+}
+
+function normalizeLookupKey(value: string): string {
+  return value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+function createNameLookup<T extends { id: string; name: string }>(items: T[]): Map<string, T> {
+  return new Map(items.map((item) => [normalizeLookupKey(item.name), item]));
+}
+
+function normalizeLevel(value: string): "PREPA" | "PROFESIONAL" {
+  const normalized = normalizeLookupKey(value);
+  if (normalized === "prepa") {
+    return "PREPA";
+  }
+
+  if (normalized === "profesional") {
+    return "PROFESIONAL";
+  }
+
+  throw new Error("Nivel debe ser PREPA o PROFESIONAL.");
+}
+
+function parsePositiveInteger(value: string, field: string): number {
+  const numberValue = Number(value);
+  if (!Number.isInteger(numberValue) || numberValue <= 0) {
+    throw new Error(`${field} debe ser un numero entero positivo.`);
+  }
+
+  return numberValue;
+}
+
+function parseOptionalBoolean(value: string): boolean | null {
+  const normalized = normalizeLookupKey(value);
+  if (!normalized) {
+    return null;
+  }
+
+  if (["si", "s", "true", "1", "activo"].includes(normalized)) {
+    return true;
+  }
+
+  if (["no", "n", "false", "0", "inactivo"].includes(normalized)) {
+    return false;
+  }
+
+  throw new Error("Activo debe ser Si o No.");
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+
+  return "Error inesperado.";
 }
 
 async function exportCsv(defaultPath: string, rows: Array<Array<string | number | boolean | Date | null | undefined>>): Promise<string | null> {

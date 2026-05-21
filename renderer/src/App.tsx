@@ -902,6 +902,46 @@ export function App() {
     }, undefined, exportTarget === "students" ? "Exportando estudiantes..." : "Exportando grupos...");
   }
 
+  async function exportStudentsTemplateCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.students.exportTemplateCsv();
+      if (result) {
+        setNotice(`Plantilla de estudiantes creada en ${result}`);
+      }
+    }, undefined, "Creando plantilla...");
+  }
+
+  async function importStudentsCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.students.importCsv();
+      await refreshData();
+      setNotice(formatBulkImportNotice("estudiantes", result));
+      if (result.errors.length > 0) {
+        setError(result.errors.slice(0, 3).join(" | "));
+      }
+    }, undefined, "Importando estudiantes...");
+  }
+
+  async function exportGroupsTemplateCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.groups.exportTemplateCsv();
+      if (result) {
+        setNotice(`Plantilla de grupos creada en ${result}`);
+      }
+    }, undefined, "Creando plantilla...");
+  }
+
+  async function importGroupsCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.groups.importCsv();
+      await refreshData();
+      setNotice(formatBulkImportNotice("grupos", result));
+      if (result.errors.length > 0) {
+        setError(result.errors.slice(0, 3).join(" | "));
+      }
+    }, undefined, "Importando grupos...");
+  }
+
   async function loadTrash() {
     const [trashStudents, trashGroups, categoriesTrash, rolesTrash, careersTrash, programsTrash] = await Promise.all([
       desktopApi.students.listDeleted() as Promise<Student[]>,
@@ -1282,6 +1322,8 @@ export function App() {
                 <button onClick={() => void searchStudents()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setStudentSearch(emptyStudentSearch); void refreshData(); }}>Limpiar</button>
                 <button className="ghost-button" onClick={() => openExportModal("students")}>Exportar CSV</button>
+                <button className="ghost-button" onClick={() => void exportStudentsTemplateCsv()}>Plantilla CSV</button>
+                <button className="ghost-button" onClick={() => void importStudentsCsv()}>Importar CSV</button>
                 <button onClick={openCreateStudentModal}>Nuevo estudiante</button>
               </div>
             </div>
@@ -1337,7 +1379,7 @@ export function App() {
 
         {view === "groups" ? (
           <section className="stack-gap">
-            <div className="search-bar-horizontal">
+            <div className="search-bar-horizontal group-search-bar">
               <input value={groupSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchGroups())} onChange={(event) => setGroupSearch({ ...groupSearch, nombre: event.target.value })} placeholder="Nombre de grupo" />
               <SelectField value={groupSearch.categoryId} onChange={(event) => setGroupSearch({ ...groupSearch, categoryId: event.target.value })}>
                 <option value="">Todas las categorias</option>
@@ -1349,6 +1391,8 @@ export function App() {
                 <button onClick={() => void searchGroups()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setGroupSearch(emptyGroupSearch); void refreshData(); }}>Limpiar</button>
                 <button className="ghost-button" onClick={() => openExportModal("groups")}>Exportar CSV</button>
+                <button className="ghost-button" onClick={() => void exportGroupsTemplateCsv()}>Plantilla CSV</button>
+                <button className="ghost-button" onClick={() => void importGroupsCsv()}>Importar CSV</button>
                 <button onClick={openCreateGroupModal}>Nuevo grupo</button>
               </div>
             </div>
@@ -2336,6 +2380,14 @@ function handleSearchKeyDown(event: ReactKeyboardEvent<HTMLInputElement>, search
   if (event.key === "Enter") {
     void search();
   }
+}
+
+function formatBulkImportNotice(entityName: string, result: { created: number; failed: number }): string {
+  if (result.created === 0 && result.failed === 0) {
+    return "Importacion cancelada.";
+  }
+
+  return `${result.created} ${entityName} creados. ${result.failed} filas con error.`;
 }
 
 function localFileUrl(sourcePath: string): string {

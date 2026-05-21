@@ -427,6 +427,21 @@ textarea {
   min-width: 145px;
 }
 
+.group-search-bar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(300px, 1.25fr);
+  align-items: start;
+}
+
+.group-search-bar input,
+.group-search-bar .select-shell {
+  min-width: 0;
+}
+
+.group-search-bar .search-actions {
+  grid-column: 1 / -1;
+}
+
 .student-search-bar {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1208,6 +1223,10 @@ td {
 
   .search-actions {
     width: 100%;
+  }
+
+  .group-search-bar {
+    grid-template-columns: 1fr;
   }
 
   .student-search-bar {

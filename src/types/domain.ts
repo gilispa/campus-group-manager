@@ -127,6 +127,12 @@ export interface GroupCsvExportInput {
   columns: GroupExportColumn[];
 }
 
+export interface BulkImportResult {
+  created: number;
+  failed: number;
+  errors: string[];
+}
+
 export interface CategoryCreateInput {
   name: string;
   description?: string | null | undefined;
