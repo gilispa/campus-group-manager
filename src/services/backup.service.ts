@@ -200,9 +200,12 @@ export class BackupService {
       await Promise.all([
         prisma.student.count(),
         prisma.group.count(),
-        prisma.category.count(),
+        prisma.giro.count(),
+        prisma.portfolio.count(),
         prisma.role.count(),
         prisma.studentGroup.count(),
+        prisma.groupManagementCycle.count(),
+        prisma.pendingMembership.count(),
         prisma.adminSettings.count()
       ]);
     } catch {
@@ -217,9 +220,12 @@ export class BackupService {
     await Promise.all([
       prisma.student.count(),
       prisma.group.count(),
-      prisma.category.count(),
+      prisma.giro.count(),
+      prisma.portfolio.count(),
       prisma.role.count(),
       prisma.studentGroup.count(),
+      prisma.groupManagementCycle.count(),
+      prisma.pendingMembership.count(),
       prisma.adminSettings.count()
     ]);
   }

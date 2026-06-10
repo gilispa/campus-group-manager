@@ -3,6 +3,7 @@ dist/
 .env
 release/
 data/uploads/
+data/test-runs/
 data/database/*.db
 data/database/*.db-journal
 data/database/*.db-shm

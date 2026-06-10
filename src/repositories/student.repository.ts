@@ -10,7 +10,8 @@ export class StudentRepository {
       nombre: data.nombre,
       matricula: data.matricula,
       nivel: data.nivel,
-      generacion: data.generacion,
+      ...(data.generacion !== undefined ? { generacion: data.generacion } : {}),
+      ...(data.academicPending !== undefined ? { academicPending: data.academicPending } : {}),
       ...(data.careerId !== undefined ? { careerId: data.careerId } : {}),
       ...(data.prepaProgramId !== undefined ? { prepaProgramId: data.prepaProgramId } : {}),
       ...(data.foto !== undefined ? { foto: data.foto } : {}),
@@ -37,6 +38,7 @@ export class StudentRepository {
       ...(data.careerId !== undefined ? { careerId: data.careerId } : {}),
       ...(data.prepaProgramId !== undefined ? { prepaProgramId: data.prepaProgramId } : {}),
       ...(data.generacion !== undefined ? { generacion: data.generacion } : {}),
+      ...(data.academicPending !== undefined ? { academicPending: data.academicPending } : {}),
       ...(data.foto !== undefined ? { foto: data.foto } : {}),
       ...(data.telefono !== undefined ? { telefono: data.telefono } : {}),
       ...(data.email !== undefined ? { email: data.email } : {}),
@@ -55,13 +57,21 @@ export class StudentRepository {
   }
 
   async delete(id: string): Promise<Student> {
-    return this.prisma.student.update({
-      where: { id },
-      data: { deletedAt: new Date(), activo: false },
-      include: {
-        career: true,
-        prepaProgram: true
-      }
+    const deletedAt = new Date();
+    return this.prisma.$transaction(async (transaction) => {
+      await transaction.studentGroup.updateMany({
+        where: { studentId: id, active: true },
+        data: { active: false, leftAt: deletedAt }
+      });
+
+      return transaction.student.update({
+        where: { id },
+        data: { deletedAt, activo: false },
+        include: {
+          career: true,
+          prepaProgram: true
+        }
+      });
     });
   }
 
@@ -126,11 +136,13 @@ export class StudentRepository {
   async search(filters: StudentSearchFilters): Promise<Student[]> {
     const roleIds = filters.roleIds?.length ? filters.roleIds : (filters.roleId ? [filters.roleId] : []);
     const groupIds = filters.groupIds ?? [];
-    const categoryIds = filters.categoryIds ?? [];
-    const shouldFilterMemberships = roleIds.length > 0 || groupIds.length > 0 || categoryIds.length > 0;
+    const giroIds = filters.giroIds ?? [];
+    const portfolioIds = filters.portfolioIds ?? [];
+    const shouldFilterMemberships = roleIds.length > 0 || groupIds.length > 0 || giroIds.length > 0 || portfolioIds.length > 0;
     const groupWhere: Prisma.GroupWhereInput = {
       deletedAt: null,
-      ...(categoryIds.length > 0 ? { categoryId: { in: categoryIds } } : {})
+      ...(giroIds.length > 0 ? { giroId: { in: giroIds } } : {}),
+      ...(portfolioIds.length > 0 ? { portfolioId: { in: portfolioIds } } : {})
     };
     const membershipWhere: Prisma.StudentGroupWhereInput = {
       ...(filters.participationStatus === "all" ? {} : { active: true }),
@@ -180,6 +192,16 @@ export class StudentRepository {
         prepaProgram: true
       },
       orderBy: { deletedAt: "desc" }
+    });
+  }
+
+  async findDeletedById(id: string): Promise<Student | null> {
+    return this.prisma.student.findFirst({
+      where: { id, deletedAt: { not: null } },
+      include: {
+        career: true,
+        prepaProgram: true
+      }
     });
   }
 

@@ -7,7 +7,8 @@ import { getPrismaClient } from "../database/prisma";
 import { CareerRepository } from "../repositories/career.repository";
 import { PrepaProgramRepository } from "../repositories/prepa-program.repository";
 import { StudentRepository } from "../repositories/student.repository";
-import type { StudentCreateInput, StudentSearchFilters, StudentUpdateInput } from "../types/domain";
+import { PendingMembershipService } from "./pending-membership.service";
+import type { GraduateStudentsInput, StudentCreateInput, StudentSearchFilters, StudentUpdateInput } from "../types/domain";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import { validateStudentCreate, validateStudentSearchFilters, validateStudentUpdate } from "../validation/student.validation";
 
@@ -16,6 +17,7 @@ export class StudentService {
   private readonly repository = new StudentRepository(this.prisma);
   private readonly careerRepository = new CareerRepository(this.prisma);
   private readonly prepaProgramRepository = new PrepaProgramRepository(this.prisma);
+  private readonly pendingMembershipService = new PendingMembershipService();
 
   async createStudent(input: StudentCreateInput) {
     const data = validateStudentCreate(input);
@@ -23,7 +25,9 @@ export class StudentService {
     await this.ensureUniqueStudentFields(data);
 
     try {
-      return await this.repository.create(data);
+      const created = await this.repository.create(data);
+      await this.pendingMembershipService.resolvePendingMembershipsForStudent(created.id, created.matricula);
+      return created;
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "P2002") {
         throw new ConflictError("Ya existe un estudiante con esa matricula.");
@@ -40,7 +44,9 @@ export class StudentService {
     await this.ensureUniqueStudentFields(this.getChangedUniqueStudentFields(current, data), id);
 
     try {
-      return await this.repository.update(id, data);
+      const updated = await this.repository.update(id, data);
+      await this.pendingMembershipService.resolvePendingMembershipsForStudent(updated.id, updated.matricula);
+      return updated;
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "P2002") {
         throw new ConflictError("Ya existe un estudiante con esa matricula.");
@@ -56,6 +62,17 @@ export class StudentService {
   }
 
   async restoreStudent(id: string) {
+    const deletedStudent = await this.repository.findDeletedById(id);
+    if (!deletedStudent) {
+      throw new NotFoundError("El estudiante no esta en la papelera.");
+    }
+
+    await this.ensureUniqueStudentFields({
+      nombre: deletedStudent.nombre,
+      matricula: deletedStudent.matricula,
+      email: deletedStudent.email
+    }, id);
+
     return this.repository.restore(id);
   }
 
@@ -87,6 +104,72 @@ export class StudentService {
   async searchStudents(filters: StudentSearchFilters) {
     const normalized = validateStudentSearchFilters(filters);
     return this.repository.search(normalized);
+  }
+
+  async graduateStudents(input: GraduateStudentsInput) {
+    const studentIds = Array.from(new Set(input.studentIds.map((studentId) => studentId.trim()).filter(Boolean)));
+    if (studentIds.length === 0) {
+      return { graduated: 0, transitioned: 0, deactivatedMemberships: 0 };
+    }
+
+    const students = await this.prisma.student.findMany({
+      where: {
+        id: { in: studentIds },
+        nivel: input.level,
+        deletedAt: null
+      },
+      select: { id: true }
+    });
+    const eligibleStudentIds = students.map((student) => student.id);
+    const eligibleSet = new Set(eligibleStudentIds);
+    const continuingPrepaIds = input.level === "PREPA"
+      ? Array.from(new Set((input.prepaContinuingStudentIds ?? []).filter((studentId) => eligibleSet.has(studentId))))
+      : [];
+    const continuingSet = new Set(continuingPrepaIds);
+    const graduatingIds = eligibleStudentIds.filter((studentId) => !continuingSet.has(studentId));
+
+    const result = {
+      graduated: graduatingIds.length,
+      transitioned: continuingPrepaIds.length,
+      deactivatedMemberships: 0
+    };
+
+    await this.prisma.$transaction(async (transaction) => {
+      const deactivated = await transaction.studentGroup.updateMany({
+        where: {
+          studentId: { in: eligibleStudentIds },
+          active: true
+        },
+        data: {
+          active: false,
+          leftAt: new Date()
+        }
+      });
+      result.deactivatedMemberships = deactivated.count;
+
+      if (graduatingIds.length > 0) {
+        await transaction.student.updateMany({
+          where: { id: { in: graduatingIds } },
+          data: { activo: false }
+        });
+      }
+
+      if (continuingPrepaIds.length > 0) {
+        await transaction.student.updateMany({
+          where: { id: { in: continuingPrepaIds } },
+          data: {
+            nivel: "PROFESIONAL",
+            activo: true,
+            prepaProgramId: null,
+            careerId: null,
+            generacion: null,
+            academicPending: true
+          }
+        });
+      }
+    });
+
+    return result;
   }
 
   async saveStudentPhoto(sourcePath: string, currentPhoto?: string | null): Promise<string> {

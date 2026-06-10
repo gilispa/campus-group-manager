@@ -6,7 +6,7 @@ import { disconnectPrisma, getPrismaClient } from "../database/prisma";
 import { createBackendServices } from "./container";
 
 type CatalogSeed = { name: string; description: string };
-type GroupSeed = { nombre: string; descripcion: string; category: string };
+type GroupSeed = { nombre: string; descripcion: string; giro: string; portfolio: string };
 type StudentSeed = {
   nombre: string;
   matricula: string;
@@ -68,7 +68,7 @@ const careerSeeds: CatalogSeed[] = [
   { name: "Medico Cirujano Odontologo", description: "Salud bucal, diagnostico y tratamiento odontologico integral." }
 ];
 
-const categorySeeds: CatalogSeed[] = [
+const giroSeeds: CatalogSeed[] = [
   { name: "Academico y Competencias", description: "Grupos enfocados en aprendizaje, concursos, investigacion y desarrollo profesional." },
   { name: "Arte y Cultura", description: "Expresion artistica, produccion cultural y comunidad creativa." },
   { name: "Ciencia y Tecnologia", description: "Proyectos de innovacion, prototipado, robotica y tecnologia aplicada." },
@@ -79,6 +79,12 @@ const categorySeeds: CatalogSeed[] = [
   { name: "Impacto Social y Voluntariado", description: "Servicio comunitario, accion social y proyectos con causa." },
   { name: "Liderazgo y Representacion Estudiantil", description: "Consejos, sociedades de alumnos y representacion institucional." },
   { name: "Sustentabilidad", description: "Proyectos ambientales, conciencia ecologica y accion climatica." }
+];
+
+const portfolioSeeds: CatalogSeed[] = [
+  { name: "General", description: "Portafolio base para grupos estudiantiles." },
+  { name: "Liderazgo", description: "Portafolio para grupos de representacion y liderazgo." },
+  { name: "Comunidad", description: "Portafolio para grupos de comunidad, bienestar e impacto." }
 ];
 
 const roleSeeds: CatalogSeed[] = [
@@ -100,16 +106,16 @@ const roleSeeds: CatalogSeed[] = [
 ];
 
 const groupSeeds: GroupSeed[] = [
-  { nombre: "Sociedad de Alumnos de Ingenieria", descripcion: "Representacion estudiantil para carreras de ingenieria y ciencias aplicadas.", category: "Liderazgo y Representacion Estudiantil" },
-  { nombre: "Club de Robotica Aplicada", descripcion: "Diseno, programacion y prototipado de robots para retos y competencias.", category: "Ciencia y Tecnologia" },
-  { nombre: "Finanzas Tec", descripcion: "Comunidad para aprender de mercados, valuacion, inversiones y finanzas corporativas.", category: "Emprendimiento y Negocios" },
-  { nombre: "Brigada de Impacto Social", descripcion: "Organiza voluntariados, campanas y proyectos con organizaciones civiles.", category: "Impacto Social y Voluntariado" },
-  { nombre: "Foro de Debate y Politica Publica", descripcion: "Espacio para debate, analisis de coyuntura y simulaciones legislativas.", category: "Debate y Ciudadania" },
-  { nombre: "Colectivo de Diseno y Arte Digital", descripcion: "Explora ilustracion, branding, animacion y produccion creativa estudiantil.", category: "Arte y Cultura" },
-  { nombre: "Semillero Women in STEM", descripcion: "Comunidad para impulsar liderazgo, inclusion y referentes en STEM.", category: "Diversidad e Inclusion" },
-  { nombre: "Laboratorio de Emprendimiento Estudiantil", descripcion: "Valida ideas, construye MVPs y conecta talento emprendedor.", category: "Emprendimiento y Negocios" },
-  { nombre: "EcoTec Accion", descripcion: "Promueve reciclaje, consumo responsable y proyectos de sostenibilidad.", category: "Sustentabilidad" },
-  { nombre: "Movimiento Bienestar Tec", descripcion: "Genera actividades para salud mental, autocuidado y bienestar estudiantil.", category: "Deportes y Bienestar" }
+  { nombre: "Sociedad de Alumnos de Ingenieria", descripcion: "Representacion estudiantil para carreras de ingenieria y ciencias aplicadas.", giro: "Liderazgo y Representacion Estudiantil", portfolio: "Liderazgo" },
+  { nombre: "Club de Robotica Aplicada", descripcion: "Diseno, programacion y prototipado de robots para retos y competencias.", giro: "Ciencia y Tecnologia", portfolio: "General" },
+  { nombre: "Finanzas Tec", descripcion: "Comunidad para aprender de mercados, valuacion, inversiones y finanzas corporativas.", giro: "Emprendimiento y Negocios", portfolio: "General" },
+  { nombre: "Brigada de Impacto Social", descripcion: "Organiza voluntariados, campanas y proyectos con organizaciones civiles.", giro: "Impacto Social y Voluntariado", portfolio: "Comunidad" },
+  { nombre: "Foro de Debate y Politica Publica", descripcion: "Espacio para debate, analisis de coyuntura y simulaciones legislativas.", giro: "Debate y Ciudadania", portfolio: "Liderazgo" },
+  { nombre: "Colectivo de Diseno y Arte Digital", descripcion: "Explora ilustracion, branding, animacion y produccion creativa estudiantil.", giro: "Arte y Cultura", portfolio: "General" },
+  { nombre: "Semillero Women in STEM", descripcion: "Comunidad para impulsar liderazgo, inclusion y referentes en STEM.", giro: "Diversidad e Inclusion", portfolio: "Comunidad" },
+  { nombre: "Laboratorio de Emprendimiento Estudiantil", descripcion: "Valida ideas, construye MVPs y conecta talento emprendedor.", giro: "Emprendimiento y Negocios", portfolio: "General" },
+  { nombre: "EcoTec Accion", descripcion: "Promueve reciclaje, consumo responsable y proyectos de sostenibilidad.", giro: "Sustentabilidad", portfolio: "Comunidad" },
+  { nombre: "Movimiento Bienestar Tec", descripcion: "Genera actividades para salud mental, autocuidado y bienestar estudiantil.", giro: "Deportes y Bienestar", portfolio: "Comunidad" }
 ];
 
 const studentSeeds: StudentSeed[] = [
@@ -272,7 +278,17 @@ async function upsertCareers(prisma: PrismaClient, items: CatalogSeed[]) {
 
 async function upsertCategories(prisma: PrismaClient, items: CatalogSeed[]) {
   for (const item of items) {
-    await prisma.category.upsert({
+    await prisma.giro.upsert({
+      where: { name: item.name },
+      update: { description: item.description },
+      create: item
+    });
+  }
+}
+
+async function upsertPortfolios(prisma: PrismaClient, items: CatalogSeed[]) {
+  for (const item of items) {
+    await prisma.portfolio.upsert({
       where: { name: item.name },
       update: { description: item.description },
       create: item
@@ -292,8 +308,11 @@ async function upsertRoles(prisma: PrismaClient, items: CatalogSeed[]) {
 
 async function upsertGroups(prisma: PrismaClient) {
   for (const seed of groupSeeds) {
-    const category = await prisma.category.findUnique({ where: { name: seed.category } });
-    if (!category) {
+    const [giro, portfolio] = await Promise.all([
+      prisma.giro.findUnique({ where: { name: seed.giro } }),
+      prisma.portfolio.findUnique({ where: { name: seed.portfolio } })
+    ]);
+    if (!giro || !portfolio) {
       continue;
     }
 
@@ -303,7 +322,8 @@ async function upsertGroups(prisma: PrismaClient) {
         where: { id: existing.id },
         data: {
           descripcion: seed.descripcion,
-          categoryId: category.id
+          giroId: giro.id,
+          portfolioId: portfolio.id
         }
       });
       continue;
@@ -313,7 +333,8 @@ async function upsertGroups(prisma: PrismaClient) {
       data: {
         nombre: seed.nombre,
         descripcion: seed.descripcion,
-        categoryId: category.id
+        giroId: giro.id,
+        portfolioId: portfolio.id
       }
     });
   }
@@ -405,7 +426,8 @@ async function runExamples(): Promise<void> {
   }
 
   await upsertCareers(prisma, careerSeeds);
-  await upsertCategories(prisma, categorySeeds);
+  await upsertCategories(prisma, giroSeeds);
+  await upsertPortfolios(prisma, portfolioSeeds);
   await upsertRoles(prisma, roleSeeds);
   await upsertGroups(prisma);
   await upsertStudents(prisma);
@@ -413,7 +435,8 @@ async function runExamples(): Promise<void> {
 
   const summary = {
     careers: await prisma.career.count(),
-    categories: await prisma.category.count(),
+    giros: await prisma.giro.count(),
+    portfolios: await prisma.portfolio.count(),
     roles: await prisma.role.count(),
     groups: await prisma.group.count(),
     students: await prisma.student.count(),

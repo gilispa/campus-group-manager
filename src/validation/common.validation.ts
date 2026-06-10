@@ -3,6 +3,10 @@ import type {
   CareerUpdateInput,
   CategoryCreateInput,
   CategoryUpdateInput,
+  GiroCreateInput,
+  GiroUpdateInput,
+  PortfolioCreateInput,
+  PortfolioUpdateInput,
   PrepaProgramCreateInput,
   PrepaProgramUpdateInput,
   RoleCreateInput,
@@ -11,17 +15,41 @@ import type {
 import { assertNonEmptyString, assertOptionalString } from "../utils/guards";
 
 export function validateCategoryCreate(input: CategoryCreateInput): CategoryCreateInput {
+  return validateGiroCreate(input);
+}
+
+export function validateCategoryUpdate(input: CategoryUpdateInput): CategoryUpdateInput {
+  return validateGiroUpdate(input);
+}
+
+export function validateGiroCreate(input: GiroCreateInput): GiroCreateInput {
   return {
     ...input,
-    name: assertNonEmptyString(input.name, "El nombre de la categoria"),
+    name: assertNonEmptyString(input.name, "El nombre del giro"),
     description: assertOptionalString(input.description)
   };
 }
 
-export function validateCategoryUpdate(input: CategoryUpdateInput): CategoryUpdateInput {
+export function validateGiroUpdate(input: GiroUpdateInput): GiroUpdateInput {
   return {
     ...input,
-    ...(input.name !== undefined ? { name: assertNonEmptyString(input.name, "El nombre de la categoria") } : {}),
+    ...(input.name !== undefined ? { name: assertNonEmptyString(input.name, "El nombre del giro") } : {}),
+    ...(input.description !== undefined ? { description: assertOptionalString(input.description) } : {})
+  };
+}
+
+export function validatePortfolioCreate(input: PortfolioCreateInput): PortfolioCreateInput {
+  return {
+    ...input,
+    name: assertNonEmptyString(input.name, "El nombre del portafolio"),
+    description: assertOptionalString(input.description)
+  };
+}
+
+export function validatePortfolioUpdate(input: PortfolioUpdateInput): PortfolioUpdateInput {
+  return {
+    ...input,
+    ...(input.name !== undefined ? { name: assertNonEmptyString(input.name, "El nombre del portafolio") } : {}),
     ...(input.description !== undefined ? { description: assertOptionalString(input.description) } : {})
   };
 }

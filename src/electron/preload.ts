@@ -1,8 +1,23 @@
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type { DesktopApi, IpcChannel, IpcChannelMap } from "../types/ipc";
 
-function invoke<K extends IpcChannel>(channel: K, input: IpcChannelMap[K]["input"]) {
-  return ipcRenderer.invoke(channel, input) as Promise<IpcChannelMap[K]["output"]>;
+async function invoke<K extends IpcChannel>(channel: K, input: IpcChannelMap[K]["input"]) {
+  try {
+    return await ipcRenderer.invoke(channel, input) as IpcChannelMap[K]["output"];
+  } catch (error) {
+    throw new Error(cleanIpcErrorMessage(error));
+  }
+}
+
+function cleanIpcErrorMessage(error: unknown): string {
+  const rawMessage = error && typeof error === "object" && "message" in error && typeof error.message === "string"
+    ? error.message
+    : "Ocurrio un error inesperado.";
+
+  return rawMessage
+    .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+    .replace(/^(?:(?:[A-Z][A-Za-z]*Error|Error):\s*)+/, "")
+    .trim();
 }
 
 const desktopApi: DesktopApi = {
@@ -23,6 +38,26 @@ const desktopApi: DesktopApi = {
     getById: (id) => invoke("categories:getById", { id }),
     list: () => invoke("categories:list", undefined),
     listDeleted: () => invoke("categories:listDeleted", undefined)
+  },
+  giros: {
+    create: (input) => invoke("giros:create", input),
+    update: (id, data) => invoke("giros:update", { id, data }),
+    remove: (id) => invoke("giros:delete", { id }),
+    permanentDelete: (id) => invoke("giros:permanentDelete", { id }),
+    restore: (id) => invoke("giros:restore", { id }),
+    getById: (id) => invoke("giros:getById", { id }),
+    list: () => invoke("giros:list", undefined),
+    listDeleted: () => invoke("giros:listDeleted", undefined)
+  },
+  portfolios: {
+    create: (input) => invoke("portfolios:create", input),
+    update: (id, data) => invoke("portfolios:update", { id, data }),
+    remove: (id) => invoke("portfolios:delete", { id }),
+    permanentDelete: (id) => invoke("portfolios:permanentDelete", { id }),
+    restore: (id) => invoke("portfolios:restore", { id }),
+    getById: (id) => invoke("portfolios:getById", { id }),
+    list: () => invoke("portfolios:list", undefined),
+    listDeleted: () => invoke("portfolios:listDeleted", undefined)
   },
   roles: {
     create: (input) => invoke("roles:create", input),
@@ -72,7 +107,8 @@ const desktopApi: DesktopApi = {
       invoke("students:savePhoto", {
         sourcePath,
         ...(currentPhoto !== undefined ? { currentPhoto } : {})
-      })
+      }),
+    graduate: (input) => invoke("students:graduate", input)
   },
   groups: {
     create: (input) => invoke("groups:create", input),
@@ -102,7 +138,19 @@ const desktopApi: DesktopApi = {
     listGroupsOfStudents: (studentIds) => invoke("memberships:listGroupsOfStudents", { studentIds }),
     listStudentsOfGroup: (groupId) => invoke("memberships:listStudentsOfGroup", { groupId }),
     historyByStudent: (studentId) => invoke("memberships:historyByStudent", { studentId }),
-    historyByGroup: (groupId) => invoke("memberships:historyByGroup", { groupId })
+    historyByGroup: (groupId) => invoke("memberships:historyByGroup", { groupId }),
+    exportCsv: (input) => invoke("memberships:exportCsv", input),
+    exportTemplateCsv: () => invoke("memberships:exportTemplateCsv", undefined),
+    importCsv: () => invoke("memberships:importCsv", undefined)
+  },
+  groupManagement: {
+    exportTemplateXlsx: (groupId) => invoke("groupManagement:exportTemplateXlsx", { groupId }),
+    previewImportXlsx: (groupId) => invoke("groupManagement:previewImportXlsx", { groupId }),
+    applyImportXlsx: (input) => invoke("groupManagement:applyImportXlsx", input)
+  },
+  pendingMemberships: {
+    list: (filters = {}) => invoke("pendingMemberships:list", filters),
+    cancel: (id) => invoke("pendingMemberships:cancel", { id })
   },
   backup: {
     exportDatabase: (destinationFilePath) => invoke("backup:export", { destinationFilePath }),
@@ -112,9 +160,13 @@ const desktopApi: DesktopApi = {
   },
   meta: {
     getSummary: () => invoke("meta:summary", undefined),
+    getOperationalSummary: () => invoke("meta:operationalSummary", undefined),
     resolveAssetUrl: (assetPath) => invoke("meta:resolveAssetUrl", { assetPath }),
     resolveDroppedPath: (candidatePath, kind) => invoke("meta:resolveDroppedPath", { candidatePath, kind }),
     getPathForFile: (file) => webUtils.getPathForFile(file as File)
+  },
+  reports: {
+    exportCsv: (input) => invoke("reports:exportCsv", input)
   }
 };
 

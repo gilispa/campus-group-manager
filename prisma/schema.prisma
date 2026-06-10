@@ -19,7 +19,8 @@ model Student {
   nivel          StudentLevel
   careerId       String?
   prepaProgramId String?
-  generacion     Int
+  generacion     Int?
+  academicPending Boolean       @default(false)
   foto           String?
   telefono       String?
   email          String?
@@ -31,6 +32,7 @@ model Student {
   career         Career?        @relation(fields: [careerId], references: [id], onDelete: SetNull)
   prepaProgram   PrepaProgram?  @relation(fields: [prepaProgramId], references: [id], onDelete: SetNull)
   memberships    StudentGroup[]
+  resolvedPendingMemberships PendingMembership[]
 
   @@index([nombre])
   @@index([nivel])
@@ -41,28 +43,42 @@ model Student {
 }
 
 model Group {
-  id           String         @id @default(cuid())
-  nombre       String
-  descripcion  String?
-  logo         String?
-  categoryId   String?
-  deletedAt    DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  category     Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  memberships  StudentGroup[]
+  id                 String                 @id @default(cuid())
+  nombre             String
+  descripcion        String?
+  logo               String?
+  giroId             String?
+  portfolioId        String?
+  deletedAt          DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  giro               Giro?                  @relation(fields: [giroId], references: [id], onDelete: SetNull)
+  portfolio          Portfolio?             @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  memberships        StudentGroup[]
+  managementCycles   GroupManagementCycle[]
+  pendingMemberships PendingMembership[]
 
   @@index([nombre])
-  @@index([categoryId])
+  @@index([giroId])
+  @@index([portfolioId])
   @@index([deletedAt])
 }
 
-model Category {
+model Giro {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
   deletedAt   DateTime?
   createdAt   DateTime @default(now())
+  groups      Group[]
+}
+
+model Portfolio {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  deletedAt   DateTime?
+  createdAt   DateTime  @default(now())
   groups      Group[]
 }
 
@@ -73,6 +89,7 @@ model Role {
   deletedAt   DateTime?
   createdAt   DateTime       @default(now())
   memberships StudentGroup[]
+  pendingMemberships PendingMembership[]
 }
 
 model Career {
@@ -94,23 +111,71 @@ model PrepaProgram {
 }
 
 model StudentGroup {
-  id        String   @id @default(cuid())
-  studentId String
-  groupId   String
-  roleId    String?
-  joinedAt  DateTime @default(now())
-  leftAt    DateTime?
-  active    Boolean  @default(true)
-  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  group     Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  role      Role?    @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  id                String                @id @default(cuid())
+  studentId         String
+  groupId           String
+  roleId            String?
+  managementCycleId String?
+  joinedAt          DateTime              @default(now())
+  leftAt            DateTime?
+  active            Boolean               @default(true)
+  student           Student               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  group             Group                 @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role              Role?                 @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  managementCycle   GroupManagementCycle? @relation(fields: [managementCycleId], references: [id], onDelete: SetNull)
 
   @@index([studentId])
   @@index([groupId])
   @@index([roleId])
+  @@index([managementCycleId])
   @@index([active])
   @@index([studentId, active])
   @@index([groupId, active])
+}
+
+model GroupManagementCycle {
+  id                 String              @id @default(cuid())
+  groupId            String
+  label              String?
+  effectiveAt        DateTime            @default(now())
+  createdAt          DateTime            @default(now())
+  group              Group               @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberships        StudentGroup[]
+  pendingMemberships PendingMembership[]
+
+  @@index([groupId])
+  @@index([effectiveAt])
+}
+
+enum PendingMembershipStatus {
+  PENDING
+  RESOLVED
+  CANCELLED
+}
+
+model PendingMembership {
+  id                String                  @id @default(cuid())
+  matricula         String
+  nombre            String?
+  groupId           String
+  roleId            String?
+  roleName          String?
+  joinedAt          DateTime?
+  managementCycleId String?
+  status            PendingMembershipStatus @default(PENDING)
+  resolvedAt        DateTime?
+  resolvedStudentId String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  group             Group                   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  role              Role?                   @relation(fields: [roleId], references: [id], onDelete: SetNull)
+  managementCycle   GroupManagementCycle?   @relation(fields: [managementCycleId], references: [id], onDelete: SetNull)
+  resolvedStudent   Student?                @relation(fields: [resolvedStudentId], references: [id], onDelete: SetNull)
+
+  @@index([matricula])
+  @@index([groupId])
+  @@index([status])
+  @@index([resolvedStudentId])
 }
 
 model AdminSettings {

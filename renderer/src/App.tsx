@@ -15,13 +15,19 @@ import { TrashList } from "./components/TrashList";
 import { extractDroppedSourcePath } from "./utils/dropped-file";
 import type { AppMetaSummary } from "../../src/types/ipc";
 import type {
+  BulkImportResult,
   Career,
-  Category,
+  Giro,
   Group,
   GroupExportColumn,
+  GroupManagementPreview,
   GroupSearchFilters,
+  OperationalSummary,
   ParticipationExportScope,
+  PendingMembership,
+  Portfolio,
   PrepaProgram,
+  ReportExportKind,
   Role,
   Student,
   StudentExportColumn,
@@ -29,7 +35,7 @@ import type {
 } from "../../src/types/domain";
 
 type View = "dashboard" | "students" | "groups" | "catalogs" | "account" | "backups";
-type GroupWithCategory = Group & { category: Category | null };
+type GroupWithCatalogs = Group & { giro: Giro | null; portfolio: Portfolio | null };
 type StudentMembership = {
   id: string;
   studentId: string;
@@ -38,7 +44,7 @@ type StudentMembership = {
   leftAt: string | Date | null;
   active: boolean;
   role: Role | null;
-  group: GroupWithCategory;
+  group: GroupWithCatalogs;
 };
 type GroupMembership = {
   id: string;
@@ -50,9 +56,22 @@ type GroupMembership = {
   role: Role | null;
   student: Student;
 };
+type PendingMembershipRow = PendingMembership & {
+  group: GroupWithCatalogs;
+  role: Role | null;
+  resolvedStudent: Student | null;
+};
+type GraduationState = {
+  open: boolean;
+  level: StudentLevel;
+  query: string;
+  generation: string;
+  selectedIds: string[];
+  continuingIds: string[];
+};
 type AssetMap = Record<string, string>;
-type CatalogType = "category" | "role" | "career" | "program";
-type ExportTarget = "students" | "groups";
+type CatalogType = "giro" | "portfolio" | "role" | "career" | "program";
+type ExportTarget = "students" | "groups" | "memberships";
 type ConfirmState = {
   title: string;
   message: string;
@@ -69,16 +88,29 @@ type StudentExportFilterState = {
   prepaProgramId: string;
   activo: string;
   groupIds: string[];
-  categoryIds: string[];
+  giroIds: string[];
+  portfolioIds: string[];
   roleIds: string[];
   participationStatus: ParticipationExportScope;
 };
 type GroupExportFilterState = {
   groupIds: string[];
-  categoryIds: string[];
+  giroIds: string[];
+  portfolioIds: string[];
   roleIds: string[];
   studentLevel: string;
   participationStatus: ParticipationExportScope;
+};
+type StudentCreateMembershipDraft = {
+  id: string;
+  groupId: string;
+  roleId: string;
+  joinedAt: string;
+};
+type ReportOption = {
+  kind: ReportExportKind;
+  label: string;
+  description: string;
 };
 const CATALOG_PAGE_SIZE = 8;
 const SEARCH_DEBOUNCE_MS = 350;
@@ -97,7 +129,7 @@ const emptyStudentSearch = {
   activo: ""
 };
 
-const emptyGroupSearch = { nombre: "", categoryId: "" };
+const emptyGroupSearch = { nombre: "", giroId: "", portfolioId: "" };
 
 const studentExportColumnOptions: Array<{ id: StudentExportColumn; label: string }> = [
   { id: "nombre", label: "Nombre" },
@@ -118,7 +150,8 @@ const studentExportColumnOptions: Array<{ id: StudentExportColumn; label: string
 ];
 const groupExportColumnOptions: Array<{ id: GroupExportColumn; label: string }> = [
   { id: "nombre", label: "Nombre" },
-  { id: "category", label: "Categoria" },
+  { id: "giro", label: "Giro" },
+  { id: "portfolio", label: "Portafolio" },
   { id: "descripcion", label: "Descripcion" },
   { id: "activeStudents", label: "Estudiantes activos" },
   { id: "activeMatriculas", label: "Matriculas activas" },
@@ -140,13 +173,15 @@ const defaultStudentExportFilters: StudentExportFilterState = {
   prepaProgramId: "",
   activo: "",
   groupIds: [],
-  categoryIds: [],
+  giroIds: [],
+  portfolioIds: [],
   roleIds: [],
   participationStatus: "active"
 };
 const defaultGroupExportFilters: GroupExportFilterState = {
   groupIds: [],
-  categoryIds: [],
+  giroIds: [],
+  portfolioIds: [],
   roleIds: [],
   studentLevel: "",
   participationStatus: "active"
@@ -170,13 +205,21 @@ const defaultGroupForm = {
   nombre: "",
   descripcion: "",
   logo: "",
-  categoryId: ""
+  giroId: "",
+  portfolioId: ""
 };
 
 const defaultCatalogForm = {
   name: "",
   description: ""
 };
+const reportOptions: ReportOption[] = [
+  { kind: "participations", label: "Pertenencias completas", description: "Incluye historicas y vigentes por alumno y grupo." },
+  { kind: "studentsWithoutActiveGroup", label: "Estudiantes sin grupo", description: "Alumnos activos sin pertenencia vigente." },
+  { kind: "groupsWithoutLeader", label: "Grupos sin lider", description: "Grupos activos sin rol lider, presidente o coordinador." },
+  { kind: "groupsWithLowMembership", label: "Grupos con baja pertenencia", description: "Grupos con menos de 2 pertenencias vigentes." },
+  { kind: "inactiveStudentsWithActiveMembership", label: "Inactivos con pertenencia", description: "Alumnos inactivos que aun figuran vigentes en grupos." }
+];
 
 export function App() {
   const [initialized, setInitialized] = useState<boolean | null>(null);
@@ -189,17 +232,20 @@ export function App() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
   const [summary, setSummary] = useState<AppMetaSummary | null>(null);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const [operationalSummary, setOperationalSummary] = useState<OperationalSummary | null>(null);
+  const [giros, setGiros] = useState<Giro[]>([]);
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [careers, setCareers] = useState<Career[]>([]);
   const [prepaPrograms, setPrepaPrograms] = useState<PrepaProgram[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
-  const [allGroups, setAllGroups] = useState<GroupWithCategory[]>([]);
-  const [groups, setGroups] = useState<GroupWithCategory[]>([]);
+  const [allGroups, setAllGroups] = useState<GroupWithCatalogs[]>([]);
+  const [groups, setGroups] = useState<GroupWithCatalogs[]>([]);
   const [deletedStudents, setDeletedStudents] = useState<Student[]>([]);
-  const [deletedGroups, setDeletedGroups] = useState<GroupWithCategory[]>([]);
-  const [deletedCategories, setDeletedCategories] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
+  const [deletedGroups, setDeletedGroups] = useState<GroupWithCatalogs[]>([]);
+  const [deletedGiros, setDeletedGiros] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
+  const [deletedPortfolios, setDeletedPortfolios] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
   const [deletedRoles, setDeletedRoles] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
   const [deletedCareers, setDeletedCareers] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
   const [deletedPrograms, setDeletedPrograms] = useState<Array<{ id: string; name: string; description?: string | null }>>([]);
@@ -224,6 +270,7 @@ export function App() {
   const [groupExportColumns, setGroupExportColumns] = useState<GroupExportColumn[]>(defaultGroupExportColumns);
 
   const [studentForm, setStudentForm] = useState(defaultStudentForm);
+  const [studentCreateMemberships, setStudentCreateMemberships] = useState<StudentCreateMembershipDraft[]>([]);
   const [pendingStudentPhotoSource, setPendingStudentPhotoSource] = useState<string | null>(null);
   const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [studentFormOpen, setStudentFormOpen] = useState(false);
@@ -234,18 +281,20 @@ export function App() {
   const [groupFormOpen, setGroupFormOpen] = useState(false);
 
   const [catalogForm, setCatalogForm] = useState(defaultCatalogForm);
-  const [catalogFormType, setCatalogFormType] = useState<CatalogType>("category");
+  const [catalogFormType, setCatalogFormType] = useState<CatalogType>("giro");
   const [editingCatalogId, setEditingCatalogId] = useState<string | null>(null);
   const [catalogFormOpen, setCatalogFormOpen] = useState(false);
-  const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogType>("category");
+  const [activeCatalogTab, setActiveCatalogTab] = useState<CatalogType>("giro");
   const [catalogSearchByType, setCatalogSearchByType] = useState<Record<CatalogType, string>>({
-    category: "",
+    giro: "",
+    portfolio: "",
     role: "",
     career: "",
     program: ""
   });
   const [catalogPageByType, setCatalogPageByType] = useState<Record<CatalogType, number>>({
-    category: 1,
+    giro: 1,
+    portfolio: 1,
     role: 1,
     career: 1,
     program: 1
@@ -257,13 +306,32 @@ export function App() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const [studentDetailOpen, setStudentDetailOpen] = useState(false);
   const [groupDetailOpen, setGroupDetailOpen] = useState(false);
   const [membershipFormOpen, setMembershipFormOpen] = useState(false);
   const [studentHistoryOpen, setStudentHistoryOpen] = useState(false);
   const [groupHistoryOpen, setGroupHistoryOpen] = useState(false);
   const [membershipJoinedAt, setMembershipJoinedAt] = useState("");
+  const [studentMembershipFormOpen, setStudentMembershipFormOpen] = useState(false);
+  const [studentDetailGroupId, setStudentDetailGroupId] = useState("");
+  const [studentDetailRoleId, setStudentDetailRoleId] = useState("");
+  const [studentDetailJoinedAt, setStudentDetailJoinedAt] = useState("");
+  const [membershipExportScope, setMembershipExportScope] = useState<ParticipationExportScope>("all");
+  const [managementPreview, setManagementPreview] = useState<GroupManagementPreview | null>(null);
+  const [pendingMemberships, setPendingMemberships] = useState<PendingMembershipRow[]>([]);
+  const [pendingMembershipsOpen, setPendingMembershipsOpen] = useState(false);
+  const [graduationState, setGraduationState] = useState<GraduationState>({
+    open: false,
+    level: "PROFESIONAL",
+    query: "",
+    generation: "",
+    selectedIds: [],
+    continuingIds: []
+  });
+  const studentMembershipFormRef = useRef<HTMLDivElement | null>(null);
+  const studentHistoryRef = useRef<HTMLDivElement | null>(null);
+  const groupMembershipFormRef = useRef<HTMLDivElement | null>(null);
+  const groupHistoryRef = useRef<HTMLDivElement | null>(null);
 
   const selectedStudent = students.find((student) => student.id === selectedStudentId) ?? null;
   const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null;
@@ -318,6 +386,44 @@ export function App() {
     return () => window.clearTimeout(timeoutId);
   }, [error]);
 
+  function scrollToOpenedSection(ref: { current: HTMLElement | null }) {
+    window.setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+  }
+
+  function toggleStudentMembershipForm() {
+    const willOpen = !studentMembershipFormOpen;
+    setStudentMembershipFormOpen(willOpen);
+    if (willOpen) {
+      scrollToOpenedSection(studentMembershipFormRef);
+    }
+  }
+
+  function toggleStudentHistory() {
+    const willOpen = !studentHistoryOpen;
+    setStudentHistoryOpen(willOpen);
+    if (willOpen) {
+      scrollToOpenedSection(studentHistoryRef);
+    }
+  }
+
+  function toggleGroupMembershipForm() {
+    const willOpen = !membershipFormOpen;
+    setMembershipFormOpen(willOpen);
+    if (willOpen) {
+      scrollToOpenedSection(groupMembershipFormRef);
+    }
+  }
+
+  function toggleGroupHistory() {
+    const willOpen = !groupHistoryOpen;
+    setGroupHistoryOpen(willOpen);
+    if (willOpen) {
+      scrollToOpenedSection(groupHistoryRef);
+    }
+  }
+
   async function initializeAuth() {
     setBusy(true);
     setError(null);
@@ -355,7 +461,7 @@ export function App() {
     }
   }
 
-  async function hydrateSupportData(nextStudents: Student[], nextGroups: GroupWithCategory[]) {
+  async function hydrateSupportData(nextStudents: Student[], nextGroups: GroupWithCatalogs[]) {
     const uniqueAssetPaths = Array.from(new Set([
       ...nextStudents.map((student) => student.foto).filter(Boolean),
       ...nextGroups.map((group) => group.logo).filter(Boolean)
@@ -379,24 +485,32 @@ export function App() {
   async function refreshData() {
     const [
       summaryResult,
-      categoriesResult,
+      operationalSummaryResult,
+      girosResult,
+      portfoliosResult,
       rolesResult,
       careersResult,
       prepaProgramsResult,
       studentsResult,
-      groupsResult
+      groupsResult,
+      pendingMembershipsResult
     ] = await Promise.all([
       desktopApi.meta.getSummary(),
-      desktopApi.categories.list() as Promise<Category[]>,
+      desktopApi.meta.getOperationalSummary(),
+      desktopApi.giros.list() as Promise<Giro[]>,
+      desktopApi.portfolios.list() as Promise<Portfolio[]>,
       desktopApi.roles.list() as Promise<Role[]>,
       desktopApi.careers.list() as Promise<Career[]>,
       desktopApi.prepaPrograms.list() as Promise<PrepaProgram[]>,
       desktopApi.students.list() as Promise<Student[]>,
-      desktopApi.groups.list() as Promise<GroupWithCategory[]>
+      desktopApi.groups.list() as Promise<GroupWithCatalogs[]>,
+      desktopApi.pendingMemberships.list({ status: "PENDING" }) as Promise<PendingMembershipRow[]>
     ]);
 
     setSummary(summaryResult);
-    setCategories(categoriesResult);
+    setOperationalSummary(operationalSummaryResult);
+    setGiros(girosResult);
+    setPortfolios(portfoliosResult);
     setRoles(rolesResult);
     setCareers(careersResult);
     setPrepaPrograms(prepaProgramsResult);
@@ -404,6 +518,7 @@ export function App() {
     setStudents(studentsResult);
     setAllGroups(groupsResult);
     setGroups(groupsResult);
+    setPendingMemberships(pendingMembershipsResult);
 
     if (!selectedStudentId || !studentsResult.some((student) => student.id === selectedStudentId)) {
       setSelectedStudentId(studentsResult[0]?.id ?? "");
@@ -425,7 +540,7 @@ export function App() {
       await desktopApi.auth.setInitialPassword({ password: setupPassword });
       setInitialized(true);
       setSetupPassword("");
-    }, "Contrasena inicial configurada.");
+    }, "Contraseña inicial configurada.");
   }
 
   async function handleLogin() {
@@ -442,11 +557,16 @@ export function App() {
       await desktopApi.auth.logout();
       setAuthenticated(false);
       setView("dashboard");
+      setSummary(null);
+      setOperationalSummary(null);
+      setGiros([]);
+      setPortfolios([]);
       setAllStudents([]);
       setStudents([]);
       setAllGroups([]);
       setGroups([]);
       setStudentMembershipIndex({});
+      setPendingMemberships([]);
       setAssetUrls({});
     }, "Sesion cerrada.", "Cerrando sesion...");
   }
@@ -454,20 +574,18 @@ export function App() {
   async function handlePasswordChange() {
     await withAction(async () => {
       if (newPassword !== confirmPassword) {
-        throw new Error("Las nuevas contrasenas no coinciden.");
+        throw new Error("Las nuevas contraseñas no coinciden.");
       }
 
-      const isValid = await desktopApi.auth.verifyPassword(oldPassword);
-      if (!isValid) {
-        throw new Error("La contrasena anterior es incorrecta.");
-      }
-
-      await desktopApi.auth.updatePassword({ password: newPassword });
+      await desktopApi.auth.updatePassword({
+        currentPassword: oldPassword,
+        newPassword
+      });
       setPasswordModalOpen(false);
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    }, "Contrasena actualizada.");
+    }, "Contraseña actualizada.");
   }
 
   function buildStudentFilters() {
@@ -487,7 +605,8 @@ export function App() {
   function buildGroupFilters() {
     return {
       ...(groupSearch.nombre ? { nombre: groupSearch.nombre } : {}),
-      ...(groupSearch.categoryId ? { categoryId: groupSearch.categoryId } : {})
+      ...(groupSearch.giroId ? { giroId: groupSearch.giroId } : {}),
+      ...(groupSearch.portfolioId ? { portfolioId: groupSearch.portfolioId } : {})
     };
   }
 
@@ -517,7 +636,7 @@ export function App() {
 
   async function searchGroups(showBusy = true) {
     const run = async () => {
-      const results = await desktopApi.groups.search(buildGroupFilters()) as GroupWithCategory[];
+      const results = await desktopApi.groups.search(buildGroupFilters()) as GroupWithCatalogs[];
 
       setGroups(results);
       if (!results.some((group) => group.id === selectedGroupId)) {
@@ -545,12 +664,13 @@ export function App() {
         ? await desktopApi.students.savePhoto(pendingStudentPhotoSource, studentForm.foto || undefined)
         : studentForm.foto;
       const payload = {
+        academicPending: studentForm.nivel === "PROFESIONAL" && (!studentForm.careerId || !studentForm.generacion),
         nombre: studentForm.nombre,
         matricula: studentForm.matricula,
         nivel: studentForm.nivel,
         careerId: studentForm.nivel === "PROFESIONAL" ? studentForm.careerId : null,
         prepaProgramId: studentForm.nivel === "PREPA" ? studentForm.prepaProgramId : null,
-        generacion: Number(studentForm.generacion),
+        generacion: studentForm.generacion ? Number(studentForm.generacion) : null,
         foto: savedPhoto || null,
         telefono: studentForm.telefono,
         email: studentForm.email,
@@ -560,13 +680,38 @@ export function App() {
 
       if (editingStudentId) {
         await desktopApi.students.update(editingStudentId, payload);
-      } else {
-        await desktopApi.students.create(payload);
+        resetStudentForm();
+        await refreshData();
+        return;
+      }
+
+      const createdStudent = await desktopApi.students.create(payload) as Student;
+      const draftMemberships = studentCreateMemberships.filter((membership) => membership.groupId);
+      const creationErrors: string[] = [];
+
+      for (const [index, membership] of draftMemberships.entries()) {
+        try {
+          await desktopApi.memberships.add({
+            studentId: createdStudent.id,
+            groupId: membership.groupId,
+            roleId: membership.roleId || null,
+            ...(membership.joinedAt ? { joinedAt: new Date(membership.joinedAt) } : {})
+          });
+        } catch (error) {
+          creationErrors.push(`Pertenencia ${index + 1}: ${getErrorMessage(error)}`);
+        }
       }
 
       resetStudentForm();
       await refreshData();
-    }, editingStudentId ? "Estudiante actualizado." : "Estudiante creado.", editingStudentId ? "Guardando estudiante..." : "Creando estudiante...");
+
+      if (creationErrors.length > 0) {
+        setNotice("Estudiante creado con advertencias en pertenencias.");
+        setError(creationErrors.slice(0, 3).join(" | "));
+      } else {
+        setNotice("Estudiante creado.");
+      }
+    }, editingStudentId ? "Estudiante actualizado." : undefined, editingStudentId ? "Guardando estudiante..." : "Creando estudiante...");
   }
 
   async function submitGroup() {
@@ -578,7 +723,8 @@ export function App() {
         nombre: groupForm.nombre,
         descripcion: groupForm.descripcion,
         logo: savedLogo || null,
-        categoryId: groupForm.categoryId || null
+        giroId: groupForm.giroId || null,
+        portfolioId: groupForm.portfolioId || null
       };
 
       if (editingGroupId) {
@@ -599,11 +745,19 @@ export function App() {
         description: catalogForm.description
       };
 
-      if (catalogFormType === "category") {
+      if (catalogFormType === "giro") {
         if (editingCatalogId) {
-          await desktopApi.categories.update(editingCatalogId, payload);
+          await desktopApi.giros.update(editingCatalogId, payload);
         } else {
-          await desktopApi.categories.create(payload);
+          await desktopApi.giros.create(payload);
+        }
+      }
+
+      if (catalogFormType === "portfolio") {
+        if (editingCatalogId) {
+          await desktopApi.portfolios.update(editingCatalogId, payload);
+        } else {
+          await desktopApi.portfolios.create(payload);
         }
       }
 
@@ -642,6 +796,10 @@ export function App() {
       const history = await desktopApi.memberships.historyByStudent(studentId) as StudentMembership[];
       setStudentMemberships(history);
       setStudentHistoryOpen(false);
+      setStudentMembershipFormOpen(false);
+      setStudentDetailGroupId("");
+      setStudentDetailRoleId("");
+      setStudentDetailJoinedAt("");
       setStudentDetailOpen(true);
     });
   }
@@ -697,17 +855,42 @@ export function App() {
       await refreshData();
       await refreshSelectedGroupMemberships();
       await refreshSelectedStudentMemberships();
-    }, "Participacion agregada.");
+    }, "Pertenencia agregada.");
+  }
+
+  async function createMembershipFromStudentDetail() {
+    await withAction(async () => {
+      if (!selectedStudentId || !studentDetailGroupId) {
+        throw new Error("Debes seleccionar un grupo para agregar la pertenencia.");
+      }
+
+      await desktopApi.memberships.add({
+        studentId: selectedStudentId,
+        groupId: studentDetailGroupId,
+        roleId: studentDetailRoleId || null,
+        ...(studentDetailJoinedAt ? { joinedAt: new Date(studentDetailJoinedAt) } : {})
+      });
+
+      setStudentDetailGroupId("");
+      setStudentDetailRoleId("");
+      setStudentDetailJoinedAt("");
+      setStudentMembershipFormOpen(false);
+      await refreshData();
+      await refreshSelectedStudentMemberships();
+      if (selectedGroupId) {
+        await refreshSelectedGroupMemberships();
+      }
+    }, "Pertenencia agregada al estudiante.");
   }
 
   async function removeMembership(studentId: string, groupId: string) {
-    confirmAction("Remover participacion", "La participacion activa pasara al historial del grupo.", "Remover", async () => {
+    confirmAction("Remover pertenencia", "La pertenencia vigente pasara al historial del grupo.", "Remover", async () => {
       await withAction(async () => {
         await desktopApi.memberships.remove({ studentId, groupId });
         await refreshData();
         await refreshSelectedGroupMemberships();
         await refreshSelectedStudentMemberships();
-      }, "Participacion desactivada.", "Removiendo participacion...");
+      }, "Pertenencia archivada.", "Removiendo pertenencia...");
     });
   }
 
@@ -717,6 +900,36 @@ export function App() {
       await refreshSelectedGroupMemberships();
       await refreshSelectedStudentMemberships();
     }, "Rol actualizado.");
+  }
+
+  async function exportMembershipTemplateCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.memberships.exportTemplateCsv();
+      if (result) {
+        setNotice(`Plantilla de pertenencias creada en ${result}`);
+      }
+    }, undefined, "Creando plantilla de pertenencias...");
+  }
+
+  async function importMembershipsCsv() {
+    await withAction(async () => {
+      const result = await desktopApi.memberships.importCsv();
+      await refreshData();
+      setNotice(formatBulkImportNotice("pertenencias", result));
+      if (result.errors.length > 0) {
+        setError(result.errors.slice(0, 3).join(" | "));
+      }
+    }, undefined, "Importando pertenencias...");
+  }
+
+  async function exportOperationalReport(kind: ReportExportKind) {
+    await withAction(async () => {
+      const result = await desktopApi.reports.exportCsv({ kind });
+      if (result) {
+        const option = reportOptions.find((entry) => entry.kind === kind);
+        setNotice(`${option?.label ?? "Reporte"} exportado en ${result}`);
+      }
+    }, undefined, "Exportando reporte...");
   }
 
   function confirmAction(title: string, message: string, confirmLabel: string, onConfirm: () => Promise<void>) {
@@ -746,8 +959,11 @@ export function App() {
   async function removeCatalog(type: CatalogType, id: string) {
     confirmAction("Eliminar catalogo", "El registro se movera a la papelera y podra restaurarse despues.", "Eliminar", async () => {
       await withAction(async () => {
-        if (type === "category") {
-          await desktopApi.categories.remove(id);
+        if (type === "giro") {
+          await desktopApi.giros.remove(id);
+        }
+        if (type === "portfolio") {
+          await desktopApi.portfolios.remove(id);
         }
         if (type === "role") {
           await desktopApi.roles.remove(id);
@@ -834,10 +1050,12 @@ export function App() {
         activo: studentSearch.activo,
         roleIds: studentSearch.roleId ? [studentSearch.roleId] : []
       });
-    } else {
+    }
+    if (target === "groups") {
       setGroupExportFilters({
         ...defaultGroupExportFilters,
-        categoryIds: groupSearch.categoryId ? [groupSearch.categoryId] : []
+        giroIds: groupSearch.giroId ? [groupSearch.giroId] : [],
+        portfolioIds: groupSearch.portfolioId ? [groupSearch.portfolioId] : []
       });
     }
     setExportModalOpen(true);
@@ -855,7 +1073,8 @@ export function App() {
       ...(studentExportFilters.activo === "true" ? { activo: true } : {}),
       ...(studentExportFilters.activo === "false" ? { activo: false } : {}),
       ...(studentExportFilters.groupIds.length ? { groupIds: studentExportFilters.groupIds } : {}),
-      ...(studentExportFilters.categoryIds.length ? { categoryIds: studentExportFilters.categoryIds } : {}),
+      ...(studentExportFilters.giroIds.length ? { giroIds: studentExportFilters.giroIds } : {}),
+      ...(studentExportFilters.portfolioIds.length ? { portfolioIds: studentExportFilters.portfolioIds } : {}),
       ...(studentExportFilters.roleIds.length ? { roleIds: studentExportFilters.roleIds } : {}),
       participationStatus: studentExportFilters.participationStatus
     };
@@ -864,7 +1083,8 @@ export function App() {
   function buildGroupExportFilters(): GroupSearchFilters {
     return {
       ...(groupExportFilters.groupIds.length ? { groupIds: groupExportFilters.groupIds } : {}),
-      ...(groupExportFilters.categoryIds.length ? { categoryIds: groupExportFilters.categoryIds } : {}),
+      ...(groupExportFilters.giroIds.length ? { giroIds: groupExportFilters.giroIds } : {}),
+      ...(groupExportFilters.portfolioIds.length ? { portfolioIds: groupExportFilters.portfolioIds } : {}),
       ...(groupExportFilters.roleIds.length ? { roleIds: groupExportFilters.roleIds } : {}),
       ...(groupExportFilters.studentLevel ? { studentLevel: groupExportFilters.studentLevel as StudentLevel } : {}),
       participationStatus: groupExportFilters.participationStatus
@@ -888,18 +1108,31 @@ export function App() {
         return;
       }
 
-      if (groupExportColumns.length === 0) {
-        throw new Error("Selecciona al menos una columna para exportar grupos.");
+      if (exportTarget === "groups") {
+        if (groupExportColumns.length === 0) {
+          throw new Error("Selecciona al menos una columna para exportar grupos.");
+        }
+        const result = await desktopApi.groups.exportCsv({
+          filters: buildGroupExportFilters(),
+          columns: groupExportColumns
+        });
+        if (result) {
+          setExportModalOpen(false);
+          setNotice(`Grupos exportados a ${result}`);
+        }
+        return;
       }
-      const result = await desktopApi.groups.exportCsv({
-        filters: buildGroupExportFilters(),
-        columns: groupExportColumns
-      });
+
+      const result = await desktopApi.memberships.exportCsv({ participationStatus: membershipExportScope });
       if (result) {
         setExportModalOpen(false);
-        setNotice(`Grupos exportados a ${result}`);
+        setNotice(`Pertenencias exportadas a ${result}`);
       }
-    }, undefined, exportTarget === "students" ? "Exportando estudiantes..." : "Exportando grupos...");
+    }, undefined, exportTarget === "students"
+      ? "Exportando estudiantes..."
+      : exportTarget === "groups"
+        ? "Exportando grupos..."
+        : "Exportando pertenencias...");
   }
 
   async function exportStudentsTemplateCsv() {
@@ -942,18 +1175,105 @@ export function App() {
     }, undefined, "Importando grupos...");
   }
 
+  async function loadPendingMemberships() {
+    const rows = await desktopApi.pendingMemberships.list({ status: "PENDING" }) as PendingMembershipRow[];
+    setPendingMemberships(rows);
+  }
+
+  async function cancelPendingMembership(pending: PendingMembershipRow) {
+    confirmAction(
+      "Cancelar pendiente",
+      `La matricula ${pending.matricula} dejara de aparecer como alumno pendiente por agregar.`,
+      "Cancelar pendiente",
+      async () => {
+        await withAction(async () => {
+          await desktopApi.pendingMemberships.cancel(pending.id);
+          await loadPendingMemberships();
+        }, "Pendiente cancelado.", "Cancelando pendiente...");
+      }
+    );
+  }
+
+  async function exportManagementTemplate(groupId: string) {
+    await withAction(async () => {
+      const result = await desktopApi.groupManagement.exportTemplateXlsx(groupId);
+      if (result) {
+        setNotice(`Plantilla de cambio de gestion creada en ${result}`);
+      }
+    }, undefined, "Creando plantilla de gestion...");
+  }
+
+  async function previewManagementImport(groupId: string) {
+    await withAction(async () => {
+      const preview = await desktopApi.groupManagement.previewImportXlsx(groupId);
+      setManagementPreview(preview.filePath ? preview : null);
+      if (preview.filePath) {
+        setNotice(`Preview listo: ${preview.ready} listos, ${preview.pending} pendientes, ${preview.errors} errores.`);
+      }
+    }, undefined, "Leyendo Excel de gestion...");
+  }
+
+  async function applyManagementImport(groupId: string) {
+    if (!managementPreview?.filePath) {
+      return;
+    }
+
+    confirmAction("Aplicar cambio de gestion", "Las pertenencias vigentes del grupo pasaran al historial y se cargara la nueva gestion.", "Aplicar", async () => {
+      await withAction(async () => {
+        const result = await desktopApi.groupManagement.applyImportXlsx({
+          groupId,
+          filePath: managementPreview.filePath ?? ""
+        });
+        await refreshData();
+        await refreshSelectedGroupMemberships();
+        await loadPendingMemberships();
+        setManagementPreview(null);
+        setNotice(`${result.archived} pertenencias archivadas. ${result.created} creadas. ${result.pending} pendientes.`);
+        if (result.errors.length > 0) {
+          setError(result.errors.slice(0, 3).join(" | "));
+        }
+      }, undefined, "Aplicando cambio de gestion...");
+    });
+  }
+
+  function openGraduationModal() {
+    setGraduationState({
+      open: true,
+      level: "PROFESIONAL",
+      query: "",
+      generation: "",
+      selectedIds: [],
+      continuingIds: []
+    });
+  }
+
+  async function submitGraduation() {
+    await withAction(async () => {
+      const result = await desktopApi.students.graduate({
+        level: graduationState.level,
+        studentIds: graduationState.selectedIds,
+        prepaContinuingStudentIds: graduationState.level === "PREPA" ? graduationState.continuingIds : []
+      });
+      setGraduationState((current) => ({ ...current, open: false }));
+      await refreshData();
+      setNotice(`${result.graduated} graduados. ${result.transitioned} pasan a Profesional. ${result.deactivatedMemberships} pertenencias archivadas.`);
+    }, undefined, "Graduando alumnos...");
+  }
+
   async function loadTrash() {
-    const [trashStudents, trashGroups, categoriesTrash, rolesTrash, careersTrash, programsTrash] = await Promise.all([
+    const [trashStudents, trashGroups, girosTrash, portfoliosTrash, rolesTrash, careersTrash, programsTrash] = await Promise.all([
       desktopApi.students.listDeleted() as Promise<Student[]>,
-      desktopApi.groups.listDeleted() as Promise<GroupWithCategory[]>,
-      desktopApi.categories.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>,
+      desktopApi.groups.listDeleted() as Promise<GroupWithCatalogs[]>,
+      desktopApi.giros.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>,
+      desktopApi.portfolios.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>,
       desktopApi.roles.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>,
       desktopApi.careers.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>,
       desktopApi.prepaPrograms.listDeleted() as Promise<Array<{ id: string; name: string; description?: string | null }>>
     ]);
     setDeletedStudents(trashStudents);
     setDeletedGroups(trashGroups);
-    setDeletedCategories(categoriesTrash);
+    setDeletedGiros(girosTrash);
+    setDeletedPortfolios(portfoliosTrash);
     setDeletedRoles(rolesTrash);
     setDeletedCareers(careersTrash);
     setDeletedPrograms(programsTrash);
@@ -977,8 +1297,11 @@ export function App() {
 
   async function restoreCatalog(type: CatalogType, id: string) {
     await withAction(async () => {
-      if (type === "category") {
-        await desktopApi.categories.restore(id);
+      if (type === "giro") {
+        await desktopApi.giros.restore(id);
+      }
+      if (type === "portfolio") {
+        await desktopApi.portfolios.restore(id);
       }
       if (type === "role") {
         await desktopApi.roles.restore(id);
@@ -1031,8 +1354,11 @@ export function App() {
       "Eliminar definitivamente",
       async () => {
         await withAction(async () => {
-          if (type === "category") {
-            await desktopApi.categories.permanentDelete(id);
+          if (type === "giro") {
+            await desktopApi.giros.permanentDelete(id);
+          }
+          if (type === "portfolio") {
+            await desktopApi.portfolios.permanentDelete(id);
           }
           if (type === "role") {
             await desktopApi.roles.permanentDelete(id);
@@ -1067,27 +1393,36 @@ export function App() {
     });
   }
 
-  function openCreateStudentModal() {
+  function openCreateStudentModal(pending?: PendingMembershipRow) {
     setEditingStudentId(null);
     setPendingStudentPhotoSource(null);
+    setStudentCreateMemberships([createStudentMembershipDraft()]);
     setStudentForm({
       ...defaultStudentForm,
+      nombre: pending?.nombre ?? "",
+      matricula: pending?.matricula ?? "",
       careerId: careers[0]?.id ?? "",
       prepaProgramId: prepaPrograms[0]?.id ?? ""
     });
     setStudentFormOpen(true);
   }
 
+  function openCreateStudentFromPending(pending: PendingMembershipRow) {
+    setPendingMembershipsOpen(false);
+    openCreateStudentModal(pending);
+  }
+
   function openEditStudentModal(student: Student) {
     setEditingStudentId(student.id);
     setPendingStudentPhotoSource(null);
+    setStudentCreateMemberships([]);
     setStudentForm({
       nombre: student.nombre,
       matricula: student.matricula,
       nivel: student.nivel,
       careerId: student.careerId ?? "",
       prepaProgramId: student.prepaProgramId ?? "",
-      generacion: String(student.generacion),
+      generacion: student.generacion == null ? "" : String(student.generacion),
       foto: student.foto ?? "",
       telefono: student.telefono ?? "",
       email: student.email ?? "",
@@ -1100,8 +1435,27 @@ export function App() {
   function resetStudentForm() {
     setEditingStudentId(null);
     setPendingStudentPhotoSource(null);
+    setStudentCreateMemberships([]);
     setStudentForm(defaultStudentForm);
     setStudentFormOpen(false);
+  }
+
+  function addStudentCreateMembershipRow() {
+    setStudentCreateMemberships((current) => [...current, createStudentMembershipDraft()]);
+  }
+
+  function updateStudentCreateMembershipRow(id: string, patch: Partial<StudentCreateMembershipDraft>) {
+    setStudentCreateMemberships((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  }
+
+  function removeStudentCreateMembershipRow(id: string) {
+    setStudentCreateMemberships((current) => {
+      if (current.length <= 1) {
+        return [createStudentMembershipDraft()];
+      }
+
+      return current.filter((row) => row.id !== id);
+    });
   }
 
   function openCreateGroupModal() {
@@ -1109,19 +1463,21 @@ export function App() {
     setPendingGroupLogoSource(null);
     setGroupForm({
       ...defaultGroupForm,
-      categoryId: categories[0]?.id ?? ""
+      giroId: giros[0]?.id ?? "",
+      portfolioId: portfolios[0]?.id ?? ""
     });
     setGroupFormOpen(true);
   }
 
-  function openEditGroupModal(group: GroupWithCategory) {
+  function openEditGroupModal(group: GroupWithCatalogs) {
     setEditingGroupId(group.id);
     setPendingGroupLogoSource(null);
     setGroupForm({
       nombre: group.nombre,
       descripcion: group.descripcion ?? "",
       logo: group.logo ?? "",
-      categoryId: group.categoryId ?? ""
+      giroId: group.giroId ?? "",
+      portfolioId: group.portfolioId ?? ""
     });
     setGroupFormOpen(true);
   }
@@ -1146,25 +1502,29 @@ export function App() {
   function resetCatalogForm() {
     setEditingCatalogId(null);
     setCatalogForm(defaultCatalogForm);
-    setCatalogFormType("category");
+    setCatalogFormType("giro");
     setCatalogFormOpen(false);
   }
 
   const selectedStudentAssetUrl = resolveAssetUrl(assetUrls, selectedStudent?.foto);
   const selectedGroupAssetUrl = resolveAssetUrl(assetUrls, selectedGroup?.logo);
-  const selectedStudentActiveMemberships = studentMemberships.filter((membership) => membership.active);
+  const selectedStudentActiveMemberships = studentMemberships.filter((membership) => membership.active && membership.group.deletedAt === null);
   const normalizedGroupMemberSearch = groupMemberSearch.trim().toLowerCase();
   const filteredActiveMembers = groupMemberships
-    .filter((membership) => membership.active)
+    .filter((membership) => membership.active && membership.student.deletedAt === null)
     .filter((membership) => matchesMembershipSearch(membership, normalizedGroupMemberSearch));
   const filteredGroupHistory = groupMemberships.filter((membership) => matchesMembershipSearch(membership, normalizedGroupMemberSearch));
   const groupSelectOptions = allGroups.map((group) => ({
     value: group.id,
     label: group.nombre
   }));
-  const categorySelectOptions = categories.map((category) => ({
-    value: category.id,
-    label: category.name
+  const giroSelectOptions = giros.map((giro) => ({
+    value: giro.id,
+    label: giro.name
+  }));
+  const portfolioSelectOptions = portfolios.map((portfolio) => ({
+    value: portfolio.id,
+    label: portfolio.name
   }));
   const roleSelectOptions = roles.map((role) => ({
     value: role.id,
@@ -1175,7 +1535,8 @@ export function App() {
     label: `${student.nombre} - ${student.matricula}`
   }));
   const catalogItemsByType: Record<CatalogType, Array<{ id: string; name: string; description?: string | null }>> = {
-    category: categories,
+    giro: giros,
+    portfolio: portfolios,
     role: roles,
     career: careers,
     program: prepaPrograms
@@ -1193,6 +1554,22 @@ export function App() {
   );
   const totalCatalogPages = Math.max(1, Math.ceil(activeCatalogItems.length / CATALOG_PAGE_SIZE));
   const paginatedCatalogItems = activeCatalogItems.slice((activeCatalogPage - 1) * CATALOG_PAGE_SIZE, activeCatalogPage * CATALOG_PAGE_SIZE);
+  const graduationCandidates = allStudents
+    .filter((student) => student.activo && student.nivel === graduationState.level)
+    .filter((student) => !graduationState.generation || String(student.generacion ?? "").includes(graduationState.generation))
+    .filter((student) => {
+      const query = graduationState.query.trim().toLowerCase();
+      if (!query) {
+        return true;
+      }
+
+      return [student.nombre, student.matricula, String(student.generacion ?? "")]
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  const graduationSelectedSet = new Set(graduationState.selectedIds);
+  const graduationContinuingSet = new Set(graduationState.continuingIds);
 
   if (initialized === null) {
     return <LoadingScreen message="Inicializando sistema..." />;
@@ -1203,13 +1580,13 @@ export function App() {
       <AuthScreen
         logoUrl={loginLogoUrl}
         title="Acceso a ML Vincula"
-        description="Ingresa la contrasena para acceder"
+        description="Ingresa la contraseña para acceder"
         password={setupPassword}
         setPassword={setSetupPassword}
         busy={busy}
         error={error}
         notice={notice}
-        actionLabel="Guardar contrasena inicial"
+        actionLabel="Guardar contraseña inicial"
         onSubmit={() => void handleSetupPassword()}
       />
     );
@@ -1220,7 +1597,7 @@ export function App() {
       <AuthScreen
         logoUrl={loginLogoUrl}
         title="Acceso a ML Vincula"
-        description="Ingresa la contrasena para acceder"
+        description="Ingresa la contraseña para acceder"
         password={loginPassword}
         setPassword={setLoginPassword}
         busy={busy}
@@ -1257,7 +1634,7 @@ export function App() {
         <header className="topbar">
           <div>
             <h2>{getViewLabel(view)}</h2>
-            <p className="muted">Operacion diaria y administracion del sistema.</p>
+            {view === "dashboard" ? null : <p className="muted">Operacion diaria y administracion del sistema.</p>}
           </div>
           <div className="status-row">
             {busy ? <span className="pill info">{busyLabel}</span> : null}
@@ -1265,21 +1642,29 @@ export function App() {
         </header>
 
         {view === "dashboard" ? (
-          <section className="grid two-columns dashboard-grid">
-            <div className="card stats-grid">
-              <StatCard label="Estudiantes" value={summary?.students ?? 0} />
-              <StatCard label="Grupos" value={summary?.groups ?? 0} />
-              <StatCard label="Participaciones activas" value={summary?.activeMemberships ?? 0} wide />
+          <section className="stack-gap dashboard-layout">
+            <div className="section-head dashboard-section-head">
+              <div className="dashboard-section-copy">
+                <h3>Indicadores generales</h3>
+              </div>
+              <button className="small-button ghost-button button-with-icon" onClick={() => void refreshData()}>
+                <DashboardIcon name="refresh" />
+                <span>Recargar</span>
+              </button>
             </div>
-            <div className="card form-stack account-password-card">
-              <h3>Grupos recientes</h3>
-              {groups.slice(0, 6).map((group) => (
-                <div key={group.id} className="list-line">
-                  <strong>{group.nombre}</strong>
-                  <span className="muted clamp-one-line">{getGroupCategoryName(group)} - {formatDate(group.createdAt)}</span>
-                </div>
-              ))}
-              <button className="ghost-button" onClick={() => void refreshData()}>Recargar dashboard</button>
+            <div className="dashboard-panels">
+              <div className="dashboard-primary-row">
+                <DashboardSegmentCard
+                  title="General"
+                  segment={summary?.general}
+                  pendingCount={pendingMemberships.length}
+                  onPendingClick={() => setPendingMembershipsOpen(true)}
+                />
+              </div>
+              <div className="dashboard-secondary-row">
+                <DashboardSegmentCard title="Prepa" segment={summary?.prepa} />
+                <DashboardSegmentCard title="Profesional" segment={summary?.profesional} />
+              </div>
             </div>
           </section>
         ) : null}
@@ -1322,9 +1707,11 @@ export function App() {
                 <button onClick={() => void searchStudents()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setStudentSearch(emptyStudentSearch); void refreshData(); }}>Limpiar</button>
                 <button className="ghost-button" onClick={() => openExportModal("students")}>Exportar CSV</button>
-                <button className="ghost-button" onClick={() => void exportStudentsTemplateCsv()}>Plantilla CSV</button>
-                <button className="ghost-button" onClick={() => void importStudentsCsv()}>Importar CSV</button>
-                <button onClick={openCreateStudentModal}>Nuevo estudiante</button>
+                <button className="ghost-button" onClick={() => setPendingMembershipsOpen(true)}>
+                  Pendientes por agregar ({pendingMemberships.length})
+                </button>
+                <button className="ghost-button" onClick={openGraduationModal}>Graduar alumnos</button>
+                <button onClick={() => openCreateStudentModal()}>Nuevo estudiante</button>
               </div>
             </div>
 
@@ -1334,7 +1721,7 @@ export function App() {
                 {students.length === 0 ? <p className="muted">No hay estudiantes con esos filtros.</p> : null}
                 {students.map((student) => {
                   const allMemberships = studentMembershipIndex[student.id] ?? [];
-                  const activeMemberships = allMemberships.filter((membership) => membership.active);
+                  const activeMemberships = allMemberships.filter((membership) => membership.active && membership.group.deletedAt === null);
                   const studentAssetUrl = resolveAssetUrl(assetUrls, student.foto);
                   return (
                     <button key={student.id} className="list-card-button" onClick={() => void openStudentDetail(student.id)}>
@@ -1343,7 +1730,7 @@ export function App() {
                         <div className="list-copy">
                           <strong className="title-dark clamp-one-line">{student.nombre}</strong>
                           <p className="muted clamp-one-line">Matricula: {student.matricula}</p>
-                          <p className="muted clamp-one-line">{getStudentAcademicLabel(student)} - Gen {student.generacion}</p>
+                          <p className="muted clamp-one-line">{getStudentAcademicLabel(student)} - Gen {student.generacion ?? "Pendiente"}</p>
                           <div className="chip-row chip-row-tight">
                             {activeMemberships.slice(0, 3).map((membership) => (
                               <span key={membership.id} className="mini-chip" title={`${membership.group.nombre} - ${getMembershipRoleName(membership)}`}>
@@ -1351,7 +1738,7 @@ export function App() {
                               </span>
                             ))}
                             {activeMemberships.length > 3 ? <span className="mini-chip muted-chip">+{activeMemberships.length - 3}</span> : null}
-                            {activeMemberships.length === 0 ? <span className="mini-chip muted-chip">Sin grupos activos</span> : null}
+                            {activeMemberships.length === 0 ? <span className="mini-chip muted-chip">Sin pertenencias vigentes</span> : null}
                           </div>
                         </div>
                       </div>
@@ -1381,18 +1768,22 @@ export function App() {
           <section className="stack-gap">
             <div className="search-bar-horizontal group-search-bar">
               <input value={groupSearch.nombre} onKeyDown={(event) => handleSearchKeyDown(event, () => searchGroups())} onChange={(event) => setGroupSearch({ ...groupSearch, nombre: event.target.value })} placeholder="Nombre de grupo" />
-              <SelectField value={groupSearch.categoryId} onChange={(event) => setGroupSearch({ ...groupSearch, categoryId: event.target.value })}>
-                <option value="">Todas las categorias</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
+              <SelectField value={groupSearch.giroId} onChange={(event) => setGroupSearch({ ...groupSearch, giroId: event.target.value })}>
+                <option value="">Todos los giros</option>
+                {giros.map((giro) => (
+                  <option key={giro.id} value={giro.id}>{giro.name}</option>
+                ))}
+              </SelectField>
+              <SelectField value={groupSearch.portfolioId} onChange={(event) => setGroupSearch({ ...groupSearch, portfolioId: event.target.value })}>
+                <option value="">Todos los portafolios</option>
+                {portfolios.map((portfolio) => (
+                  <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>
                 ))}
               </SelectField>
               <div className="search-actions">
                 <button onClick={() => void searchGroups()}>Buscar</button>
                 <button className="ghost-button" onClick={() => { setGroupSearch(emptyGroupSearch); void refreshData(); }}>Limpiar</button>
                 <button className="ghost-button" onClick={() => openExportModal("groups")}>Exportar CSV</button>
-                <button className="ghost-button" onClick={() => void exportGroupsTemplateCsv()}>Plantilla CSV</button>
-                <button className="ghost-button" onClick={() => void importGroupsCsv()}>Importar CSV</button>
                 <button onClick={openCreateGroupModal}>Nuevo grupo</button>
               </div>
             </div>
@@ -1406,10 +1797,10 @@ export function App() {
                   return (
                     <button key={group.id} className="list-card-button" onClick={() => void openGroupDetail(group.id)}>
                       <div className="list-card-main">
-                        <AvatarImage src={groupAssetUrl} fallback={getInitials(group.nombre)} small />
+                          <AvatarImage src={groupAssetUrl} fallback={getInitials(group.nombre)} small />
                         <div className="list-copy">
                           <strong className="title-dark clamp-one-line">{group.nombre}</strong>
-                          <p className="muted clamp-one-line">Categoria: {getGroupCategoryName(group)}</p>
+                          <p className="muted clamp-one-line">Giro: {getGroupGiroName(group)} - Portafolio: {getGroupPortfolioName(group)}</p>
                           <p className="muted clamp-two-lines">{group.descripcion ?? "Sin descripcion"}</p>
                         </div>
                       </div>
@@ -1428,7 +1819,7 @@ export function App() {
         {view === "catalogs" ? (
           <section className="stack-gap">
             <div className="catalog-nav">
-              {(["category", "role", "career", "program"] as CatalogType[]).map((tab) => (
+              {(["giro", "portfolio", "role", "career", "program"] as CatalogType[]).map((tab) => (
                 <button
                   key={tab}
                   className={activeCatalogTab === tab ? "catalog-tab active" : "catalog-tab"}
@@ -1476,9 +1867,9 @@ export function App() {
         {view === "account" ? (
           <section className="stack-gap">
             <div className="card form-stack trash-section-card">
-              <h3>Contrasena</h3>
+              <h3>Contraseña</h3>
               <div className="password-preview">••••••••••</div>
-              <button onClick={() => setPasswordModalOpen(true)}>Cambiar contrasena</button>
+              <button onClick={() => setPasswordModalOpen(true)}>Cambiar contraseña</button>
             </div>
             <div className="card form-stack">
               <div className="section-head">
@@ -1489,7 +1880,8 @@ export function App() {
               <div className="trash-grid six-panels">
                 <TrashList title="Estudiantes" items={deletedStudents.map((student) => ({ id: student.id, label: student.nombre }))} onRestore={(id) => void restoreStudent(id)} onPermanentDelete={(id) => void permanentlyDeleteStudent(id)} />
                 <TrashList title="Grupos" items={deletedGroups.map((group) => ({ id: group.id, label: group.nombre }))} onRestore={(id) => void restoreGroup(id)} onPermanentDelete={(id) => void permanentlyDeleteGroup(id)} />
-                <TrashList title="Categorias" items={deletedCategories.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("category", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("category", id)} />
+                <TrashList title="Giros" items={deletedGiros.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("giro", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("giro", id)} />
+                <TrashList title="Portafolios" items={deletedPortfolios.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("portfolio", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("portfolio", id)} />
                 <TrashList title="Roles" items={deletedRoles.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("role", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("role", id)} />
                 <TrashList title="Carreras" items={deletedCareers.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("career", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("career", id)} />
                 <TrashList title="Programas" items={deletedPrograms.map((item) => ({ id: item.id, label: item.name }))} onRestore={(id) => void restoreCatalog("program", id)} onPermanentDelete={(id) => void permanentlyDeleteCatalog("program", id)} />
@@ -1499,16 +1891,44 @@ export function App() {
         ) : null}
 
         {view === "backups" ? (
-          <section className="grid two-columns">
-            <div className="card form-stack">
-              <h3>Exportar respaldo</h3>
-              <p className="muted">Exporta un respaldo .zip con base de datos e imagenes. .db sigue disponible como formato legado.</p>
-              <button onClick={() => void exportDatabaseDirect()}>Exportar respaldo</button>
+          <section className="stack-gap">
+            <div className="grid two-columns">
+              <div className="card form-stack">
+                <h3>Exportar respaldo</h3>
+                <p className="muted">Exporta un respaldo .zip con base de datos e imagenes. .db sigue disponible como formato legado.</p>
+                <button onClick={() => void exportDatabaseDirect()}>Exportar respaldo</button>
+              </div>
+              <div className="card form-stack">
+                <h3>Importar respaldo</h3>
+                <p className="muted">Importa .zip (recomendado) o .db legado. El .zip restaura base e imagenes.</p>
+                <button className="danger-button" onClick={() => void importDatabaseDirect()}>Importar y reemplazar datos actuales</button>
+              </div>
             </div>
-            <div className="card form-stack">
-              <h3>Importar respaldo</h3>
-              <p className="muted">Importa .zip (recomendado) o .db legado. El .zip restaura base e imagenes.</p>
-              <button className="danger-button" onClick={() => void importDatabaseDirect()}>Importar y reemplazar datos actuales</button>
+            <div className="grid backups-csv-grid">
+              <div className="card form-stack backup-domain-card">
+                <h3>Estudiantes CSV</h3>
+                <p className="muted">Plantilla e importacion masiva de estudiantes.</p>
+                <div className="row-actions backup-domain-actions">
+                  <button className="ghost-button" onClick={() => void exportStudentsTemplateCsv()}>Descargar plantilla para importar estudiantes</button>
+                  <button className="danger-button" onClick={() => void importStudentsCsv()}>Importar estudiantes desde CSV</button>
+                </div>
+              </div>
+              <div className="card form-stack backup-domain-card">
+                <h3>Grupos CSV</h3>
+                <p className="muted">Plantilla e importacion masiva de grupos.</p>
+                <div className="row-actions backup-domain-actions">
+                  <button className="ghost-button" onClick={() => void exportGroupsTemplateCsv()}>Descargar plantilla para importar grupos</button>
+                  <button className="danger-button" onClick={() => void importGroupsCsv()}>Importar grupos desde CSV</button>
+                </div>
+              </div>
+              <div className="card form-stack backup-domain-card">
+                <h3>Pertenencias CSV</h3>
+                <p className="muted">Plantilla e importacion masiva de pertenencias.</p>
+                <div className="row-actions backup-domain-actions">
+                  <button className="ghost-button" onClick={() => void exportMembershipTemplateCsv()}>Descargar plantilla para importar pertenencias</button>
+                  <button className="danger-button" onClick={() => void importMembershipsCsv()}>Importar pertenencias desde CSV</button>
+                </div>
+              </div>
             </div>
           </section>
         ) : null}
@@ -1561,6 +1981,41 @@ export function App() {
             onDropSource={(sourcePath) => void handleDroppedStudentPhoto(sourcePath)}
           />
 
+          {!editingStudentId ? (
+            <div className="card form-stack form-card-embedded">
+              <div className="section-head">
+                <h4>Pertenencias iniciales</h4>
+                <button className="small-button ghost-button" onClick={addStudentCreateMembershipRow}>Agregar fila</button>
+              </div>
+              {studentCreateMemberships.map((membership, index) => (
+                <div key={membership.id} className="grid compact-grid">
+                  <SelectField value={membership.groupId} onChange={(event) => updateStudentCreateMembershipRow(membership.id, { groupId: event.target.value })}>
+                    <option value="">Grupo (opcional)</option>
+                    {allGroups.map((group) => (
+                      <option key={group.id} value={group.id}>{group.nombre}</option>
+                    ))}
+                  </SelectField>
+                  <SelectField value={membership.roleId} onChange={(event) => updateStudentCreateMembershipRow(membership.id, { roleId: event.target.value })}>
+                    <option value="">Rol (opcional)</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </SelectField>
+                  <input
+                    type="datetime-local"
+                    value={membership.joinedAt}
+                    onChange={(event) => updateStudentCreateMembershipRow(membership.id, { joinedAt: event.target.value })}
+                    placeholder="Ingreso"
+                  />
+                  <div className="row-actions">
+                    <span className="muted tiny-text">Pertenencia {index + 1}</span>
+                    <button className="small-button danger-button" onClick={() => removeStudentCreateMembershipRow(membership.id)}>Quitar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <textarea value={studentForm.notas} onChange={(event) => setStudentForm({ ...studentForm, notas: event.target.value })} placeholder="Notas" />
 
           <div className="row-actions">
@@ -1570,14 +2025,44 @@ export function App() {
         </Modal>
       ) : null}
 
+      {pendingMembershipsOpen ? (
+        <Modal title="Pendientes por agregar" onClose={() => setPendingMembershipsOpen(false)} className="pending-memberships-modal-card">
+          <div className="section-head">
+            <p className="muted">Alumnos detectados en cambios de gestion que todavia no existen en la base.</p>
+            <button className="small-button ghost-button" onClick={() => void loadPendingMemberships()}>Actualizar</button>
+          </div>
+          <DataTable
+            title="Estudiantes pendientes"
+            headers={["Matricula", "Nombre", "Grupo", "Rol", "Creado", "Acciones"]}
+            rows={pendingMemberships.map((pending) => [
+              pending.matricula,
+              pending.nombre ?? "-",
+              pending.group?.nombre ?? "-",
+              pending.role?.name ?? pending.roleName ?? "Sin rol",
+              formatDate(pending.createdAt),
+              <div key={pending.id} className="row-actions pending-membership-actions">
+                <button className="small-button" onClick={() => openCreateStudentFromPending(pending)}>Agregar</button>
+                <button className="small-button danger-button" onClick={() => void cancelPendingMembership(pending)}>Cancelar</button>
+              </div>
+            ])}
+          />
+        </Modal>
+      ) : null}
+
       {groupFormOpen ? (
         <Modal title={editingGroupId ? "Editar grupo" : "Nuevo grupo"} onClose={resetGroupForm}>
           <div className="grid compact-grid">
             <input value={groupForm.nombre} onChange={(event) => setGroupForm({ ...groupForm, nombre: event.target.value })} placeholder="Nombre" />
-            <SelectField value={groupForm.categoryId} onChange={(event) => setGroupForm({ ...groupForm, categoryId: event.target.value })}>
-              <option value="">Selecciona categoria</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
+            <SelectField value={groupForm.giroId} onChange={(event) => setGroupForm({ ...groupForm, giroId: event.target.value })}>
+              <option value="">Selecciona giro</option>
+              {giros.map((giro) => (
+                <option key={giro.id} value={giro.id}>{giro.name}</option>
+              ))}
+            </SelectField>
+            <SelectField value={groupForm.portfolioId} onChange={(event) => setGroupForm({ ...groupForm, portfolioId: event.target.value })}>
+              <option value="">Selecciona portafolio</option>
+              {portfolios.map((portfolio) => (
+                <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>
               ))}
             </SelectField>
           </div>
@@ -1612,12 +2097,12 @@ export function App() {
       ) : null}
 
       {passwordModalOpen ? (
-        <Modal title="Cambiar contrasena" onClose={() => setPasswordModalOpen(false)}>
-          <input value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} placeholder="Contrasena actual" type="password" />
-          <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Nueva contrasena" type="password" />
-          <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirmar nueva contrasena" type="password" />
+        <Modal title="Cambiar contraseña" onClose={() => setPasswordModalOpen(false)}>
+          <input value={oldPassword} onChange={(event) => setOldPassword(event.target.value)} placeholder="Contraseña actual" type="password" />
+          <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Nueva contraseña" type="password" />
+          <input value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} placeholder="Confirmar nueva contraseña" type="password" />
           <div className="row-actions">
-            <button onClick={() => void handlePasswordChange()}>Guardar nueva contrasena</button>
+            <button onClick={() => void handlePasswordChange()}>Guardar nueva contraseña</button>
             <button className="ghost-button" onClick={() => setPasswordModalOpen(false)}>Cancelar</button>
           </div>
         </Modal>
@@ -1635,7 +2120,7 @@ export function App() {
               </div>
               <p className="muted clamp-two-lines">Matricula: {selectedStudent.matricula}</p>
               <p className="muted clamp-two-lines">{getStudentAcademicLabel(selectedStudent)}</p>
-              <p className="muted clamp-two-lines">Generacion: {selectedStudent.generacion}</p>
+              <p className="muted clamp-two-lines">Generacion: {selectedStudent.generacion ?? "Pendiente"}</p>
               <p className="muted clamp-two-lines">Email: {selectedStudent.email ?? "-"}</p>
               <p className="muted clamp-two-lines">Telefono: {selectedStudent.telefono ?? "-"}</p>
               {selectedStudent.notas ? <p className="muted clamp-three-lines">{selectedStudent.notas}</p> : null}
@@ -1644,49 +2129,105 @@ export function App() {
 
           <div className="detail-section">
             <h4>Grupos activos</h4>
-            {selectedStudentActiveMemberships.length === 0 ? <p className="muted">No tiene participaciones activas.</p> : null}
-            <ul className="bullet-cards">
-              {selectedStudentActiveMemberships.map((membership) => (
-                <li key={membership.id} className="bullet-card">
-                  <span className="bullet-title clamp-two-lines">{membership.group.nombre}</span>
-                  <span className="muted clamp-two-lines">{getGroupCategoryName(membership.group)}</span>
-                  <span className="mini-chip" title={getMembershipRoleName(membership)}>{getMembershipRoleName(membership)}</span>
-                </li>
-              ))}
-            </ul>
+            {selectedStudentActiveMemberships.length === 0 ? <p className="muted">No tiene pertenencias vigentes.</p> : null}
+            <DataTable
+              title="Pertenencias vigentes"
+              headers={["Grupo", "Giro", "Portafolio", "Rol", "Ingreso", "Acciones"]}
+              rows={selectedStudentActiveMemberships.map((membership) => [
+                membership.group.nombre,
+                getGroupGiroName(membership.group),
+                getGroupPortfolioName(membership.group),
+                getMembershipRoleName(membership),
+                formatDate(membership.joinedAt),
+                <div key={membership.id} className="inline-actions">
+                  <button className="small-button" onClick={() => void removeMembership(membership.studentId, membership.groupId)}>Remover</button>
+                  <SelectField
+                    compact
+                    className="small-select"
+                    value={membership.role?.id ?? ""}
+                    onChange={(event) => {
+                      void changeMembershipRole(membership.studentId, membership.groupId, event.target.value);
+                    }}
+                  >
+                    <option value="">Sin rol</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </SelectField>
+                </div>
+              ])}
+            />
           </div>
 
           <div className="row-actions">
-            <button className="small-button" onClick={() => setStudentHistoryOpen((current) => !current)}>
-              {studentHistoryOpen ? "Ocultar historial" : "Ver historial de participacion"}
+            <button className="small-button" onClick={toggleStudentMembershipForm}>
+              {studentMembershipFormOpen ? "Ocultar formulario" : "Agregar pertenencia"}
+            </button>
+            <button className="small-button" onClick={toggleStudentHistory}>
+              {studentHistoryOpen ? "Ocultar historial" : "Ver historial de pertenencias"}
             </button>
           </div>
 
+          {studentMembershipFormOpen ? (
+            <div ref={studentMembershipFormRef} className="card form-stack form-card-embedded">
+              <h4>Nueva pertenencia</h4>
+              <SelectField value={studentDetailGroupId} onChange={(event) => setStudentDetailGroupId(event.target.value)}>
+                <option value="">Selecciona grupo</option>
+                {allGroups.map((group) => (
+                  <option key={group.id} value={group.id}>{group.nombre}</option>
+                ))}
+              </SelectField>
+              <SelectField value={studentDetailRoleId} onChange={(event) => setStudentDetailRoleId(event.target.value)}>
+                <option value="">Selecciona rol</option>
+                {roles.map((role) => (
+                  <option key={role.id} value={role.id}>{role.name}</option>
+                ))}
+              </SelectField>
+              <input type="datetime-local" value={studentDetailJoinedAt} onChange={(event) => setStudentDetailJoinedAt(event.target.value)} />
+              <div className="row-actions">
+                <button onClick={() => void createMembershipFromStudentDetail()}>Guardar pertenencia</button>
+                <button className="ghost-button" onClick={() => {
+                  setStudentMembershipFormOpen(false);
+                  setStudentDetailGroupId("");
+                  setStudentDetailRoleId("");
+                  setStudentDetailJoinedAt("");
+                }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           {studentHistoryOpen ? (
-            <DataTable
-              title="Historial de participaciones"
-              headers={["Grupo", "Categoria", "Rol", "Ingreso", "Salida", "Estado"]}
-              rows={studentMemberships.map((membership) => [
-                membership.group.nombre,
-                getGroupCategoryName(membership.group),
-                getMembershipRoleName(membership),
-                formatDate(membership.joinedAt),
-                formatDate(membership.leftAt),
-                membership.active ? "Activa" : "Historica"
-              ])}
-            />
+            <div ref={studentHistoryRef} className="detail-section-anchor">
+              <DataTable
+                title="Historial de pertenencias"
+                headers={["Grupo", "Giro", "Portafolio", "Rol", "Ingreso", "Salida", "Estado"]}
+                rows={studentMemberships.map((membership) => [
+                  membership.group.nombre,
+                  getGroupGiroName(membership.group),
+                  getGroupPortfolioName(membership.group),
+                  getMembershipRoleName(membership),
+                  formatDate(membership.joinedAt),
+                  formatDate(membership.leftAt),
+                  membership.active ? "Vigente" : "Historica"
+                ])}
+              />
+            </div>
           ) : null}
         </Modal>
       ) : null}
 
       {groupDetailOpen && selectedGroup ? (
-        <Modal title="Expediente de grupo" onClose={() => { setGroupDetailOpen(false); setMembershipFormOpen(false); }}>
+        <Modal title="Expediente de grupo" onClose={() => { setGroupDetailOpen(false); setMembershipFormOpen(false); setManagementPreview(null); }}>
           <div className="profile-grid detail-layout">
             <AvatarImage src={selectedGroupAssetUrl} fallback={getInitials(selectedGroup.nombre)} />
             <div className="detail-copy">
               <h4 className="clamp-two-lines">{selectedGroup.nombre}</h4>
               <div className="badge-row">
-                <span className="badge" title={getGroupCategoryName(selectedGroup)}>{getGroupCategoryName(selectedGroup)}</span>
+                <span className="badge" title={getGroupGiroName(selectedGroup)}>{getGroupGiroName(selectedGroup)}</span>
+                <span className="badge" title={getGroupPortfolioName(selectedGroup)}>{getGroupPortfolioName(selectedGroup)}</span>
               </div>
               <p className="muted clamp-three-lines">{selectedGroup.descripcion ?? "-"}</p>
               <p className="muted clamp-two-lines">Creado: {formatDate(selectedGroup.createdAt)}</p>
@@ -1694,17 +2235,17 @@ export function App() {
           </div>
 
           <div className="row-actions">
-            <button className="small-button" onClick={() => setMembershipFormOpen((current) => !current)}>
-              {membershipFormOpen ? "Ocultar formulario" : "Agregar participacion"}
+            <button className="small-button" onClick={toggleGroupMembershipForm}>
+              {membershipFormOpen ? "Ocultar formulario" : "Agregar pertenencia"}
             </button>
-            <button className="ghost-button" onClick={() => setGroupHistoryOpen((current) => !current)}>
-              {groupHistoryOpen ? "Ocultar historial" : "Ver historial de participacion"}
+            <button className="ghost-button" onClick={toggleGroupHistory}>
+              {groupHistoryOpen ? "Ocultar historial" : "Ver historial de pertenencias"}
             </button>
           </div>
 
           {membershipFormOpen ? (
-            <div className="card form-stack form-card-embedded">
-              <h4>Nueva participacion</h4>
+            <div ref={groupMembershipFormRef} className="card form-stack form-card-embedded">
+              <h4>Nueva pertenencia</h4>
               <SelectField value={selectedStudentId} onChange={(event) => setSelectedStudentId(event.target.value)}>
                 <option value="">Selecciona estudiante</option>
                 {allStudents.map((student) => (
@@ -1719,7 +2260,7 @@ export function App() {
               </SelectField>
               <input type="datetime-local" value={membershipJoinedAt} onChange={(event) => setMembershipJoinedAt(event.target.value)} />
               <div className="row-actions">
-                <button onClick={() => void createMembership()}>Guardar participacion</button>
+                <button onClick={() => void createMembership()}>Guardar pertenencia</button>
                 <button className="ghost-button" onClick={() => { setMembershipFormOpen(false); setMembershipJoinedAt(""); }}>Cancelar</button>
               </div>
             </div>
@@ -1727,7 +2268,7 @@ export function App() {
 
           <div className="card form-stack form-card-embedded">
             <div className="section-head">
-              <h4>Miembros activos</h4>
+              <h4>Miembros vigentes</h4>
               <input value={groupMemberSearch} onChange={(event) => setGroupMemberSearch(event.target.value)} placeholder="Buscar miembro o rol" />
             </div>
             <DataTable
@@ -1758,29 +2299,166 @@ export function App() {
           </div>
 
           {groupHistoryOpen ? (
-            <DataTable
-              title="Historial del grupo"
-              headers={["Estudiante", "Rol", "Ingreso", "Salida", "Estado"]}
-              rows={filteredGroupHistory.map((membership) => [
-                `${membership.student.nombre} - ${membership.student.matricula}`,
-                getMembershipRoleName(membership),
-                formatDate(membership.joinedAt),
-                formatDate(membership.leftAt),
-                membership.active ? "Activa" : "Historica"
-              ])}
-            />
+            <div ref={groupHistoryRef} className="detail-section-anchor">
+              <DataTable
+                title="Historial del grupo"
+                headers={["Estudiante", "Rol", "Ingreso", "Salida", "Estado"]}
+                rows={filteredGroupHistory.map((membership) => [
+                  `${membership.student.nombre} - ${membership.student.matricula}`,
+                  getMembershipRoleName(membership),
+                  formatDate(membership.joinedAt),
+                  formatDate(membership.leftAt),
+                  membership.active ? "Vigente" : "Historica"
+                ])}
+              />
+            </div>
           ) : null}
+
+          <div className="card form-stack form-card-embedded">
+            <div className="section-head">
+              <h4>Cambio de gestion</h4>
+              <button className="small-button ghost-button" onClick={() => void exportManagementTemplate(selectedGroup.id)}>Descargar plantilla Excel</button>
+            </div>
+            <div className="row-actions">
+              <button className="ghost-button" onClick={() => void previewManagementImport(selectedGroup.id)}>Seleccionar Excel y previsualizar</button>
+              <button
+                className="danger-button"
+                disabled={!managementPreview?.filePath || managementPreview.errors > 0}
+                onClick={() => void applyManagementImport(selectedGroup.id)}
+              >
+                Aplicar cambio de gestion
+              </button>
+            </div>
+            {managementPreview ? (
+              <div className="form-stack">
+                <div className="stats-strip compact-stats">
+                  <StatCard label="Listos" value={managementPreview.ready} />
+                  <StatCard label="Pendientes" value={managementPreview.pending} />
+                  <StatCard label="Errores" value={managementPreview.errors} />
+                </div>
+                <DataTable
+                  title="Preview de gestion"
+                  headers={["Fila", "Matricula", "Nombre", "Rol", "Estado"]}
+                  rows={managementPreview.rows.map((row) => [
+                    row.lineNumber,
+                    row.matricula,
+                    row.nombre ?? "-",
+                    row.roleName ?? "Sin rol",
+                    row.message
+                  ])}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="card form-stack form-card-embedded">
+            <div className="section-head">
+              <h4>Alumnos pendientes</h4>
+              <button className="small-button ghost-button" onClick={() => void loadPendingMemberships()}>Actualizar</button>
+            </div>
+            <DataTable
+              title="Pendientes del grupo"
+              headers={["Matricula", "Nombre", "Rol", "Estado"]}
+              rows={pendingMemberships
+                .filter((pending) => pending.groupId === selectedGroup.id)
+                .map((pending) => [
+                  pending.matricula,
+                  pending.nombre ?? "-",
+                  pending.role?.name ?? pending.roleName ?? "Sin rol",
+                  getPendingMembershipStatusLabel(pending.status)
+                ])}
+            />
+          </div>
+        </Modal>
+      ) : null}
+
+      {graduationState.open ? (
+        <Modal title="Graduar alumnos" onClose={() => setGraduationState((current) => ({ ...current, open: false }))} className="graduation-modal-card">
+          <div className="grid compact-grid">
+            <SelectField value={graduationState.level} onChange={(event) => setGraduationState({
+              open: true,
+              level: event.target.value as StudentLevel,
+              query: "",
+              generation: "",
+              selectedIds: [],
+              continuingIds: []
+            })}>
+              <option value="PROFESIONAL">Profesional</option>
+              <option value="PREPA">Prepa</option>
+            </SelectField>
+            <input value={graduationState.generation} onChange={(event) => setGraduationState((current) => ({ ...current, generation: event.target.value }))} placeholder="Filtrar por generacion" />
+            <input value={graduationState.query} onChange={(event) => setGraduationState((current) => ({ ...current, query: event.target.value }))} placeholder="Buscar alumno" />
+          </div>
+
+          <div className="card form-stack form-card-embedded graduation-list">
+            <div className="section-head">
+              <h4>Alumnos</h4>
+              <span className="muted">{graduationState.selectedIds.length} seleccionados</span>
+            </div>
+            {graduationCandidates.length === 0 ? <p className="muted">No hay alumnos con esos filtros.</p> : null}
+            {graduationCandidates.map((student) => (
+              <div key={student.id} className="list-line-row graduation-row">
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={graduationSelectedSet.has(student.id)}
+                    onChange={(event) => {
+                      setGraduationState((current) => {
+                        const selectedIds = event.target.checked
+                          ? [...current.selectedIds, student.id]
+                          : current.selectedIds.filter((id) => id !== student.id);
+                        const continuingIds = event.target.checked
+                          ? current.continuingIds
+                          : current.continuingIds.filter((id) => id !== student.id);
+                        return { ...current, selectedIds, continuingIds };
+                      });
+                    }}
+                  />
+                  <span>{student.nombre} - {student.matricula} - {student.generacion ?? "Generacion pendiente"}</span>
+                </label>
+                {graduationState.level === "PREPA" && graduationSelectedSet.has(student.id) ? (
+                  <label className="checkbox-row">
+                    <input
+                      type="checkbox"
+                      checked={graduationContinuingSet.has(student.id)}
+                      onChange={(event) => {
+                        setGraduationState((current) => ({
+                          ...current,
+                          continuingIds: event.target.checked
+                            ? [...current.continuingIds, student.id]
+                            : current.continuingIds.filter((id) => id !== student.id)
+                        }));
+                      }}
+                    />
+                    <span>Continua en Profesional</span>
+                  </label>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          <div className="row-actions">
+            <button className="danger-button" disabled={graduationState.selectedIds.length === 0} onClick={() => void submitGraduation()}>Graduar seleccionados</button>
+            <button className="ghost-button" onClick={() => setGraduationState((current) => ({ ...current, open: false }))}>Cancelar</button>
+          </div>
         </Modal>
       ) : null}
 
       {exportModalOpen ? (
-        <Modal title="Exportar CSV" onClose={() => setExportModalOpen(false)}>
+        <Modal
+          title="Exportar CSV"
+          onClose={() => setExportModalOpen(false)}
+          className={exportTarget === "memberships" ? "export-modal-card export-modal-card-compact" : "export-modal-card"}
+        >
           <div className="catalog-nav export-tabs">
             <button className={exportTarget === "students" ? "catalog-tab active" : "catalog-tab"} onClick={() => setExportTarget("students")}>
               Estudiantes
             </button>
             <button className={exportTarget === "groups" ? "catalog-tab active" : "catalog-tab"} onClick={() => setExportTarget("groups")}>
               Grupos
+            </button>
+            <button className={exportTarget === "memberships" ? "catalog-tab active" : "catalog-tab"} onClick={() => setExportTarget("memberships")}>
+              Pertenencias
             </button>
           </div>
 
@@ -1817,7 +2495,7 @@ export function App() {
                   <option value="false">Solo inactivos</option>
                 </SelectField>
                 <SelectField value={studentExportFilters.participationStatus} onChange={(event) => setStudentExportFilters({ ...studentExportFilters, participationStatus: event.target.value as ParticipationExportScope })}>
-                  <option value="active">Participaciones activas</option>
+                  <option value="active">Pertenencias vigentes</option>
                   <option value="all">Todo el historial</option>
                 </SelectField>
                 <MultiSelectField
@@ -1827,10 +2505,16 @@ export function App() {
                   onChange={(groupIds) => setStudentExportFilters({ ...studentExportFilters, groupIds })}
                 />
                 <MultiSelectField
-                  label="Categorias"
-                  options={categorySelectOptions}
-                  selectedValues={studentExportFilters.categoryIds}
-                  onChange={(categoryIds) => setStudentExportFilters({ ...studentExportFilters, categoryIds })}
+                  label="Giros"
+                  options={giroSelectOptions}
+                  selectedValues={studentExportFilters.giroIds}
+                  onChange={(giroIds) => setStudentExportFilters({ ...studentExportFilters, giroIds })}
+                />
+                <MultiSelectField
+                  label="Portafolios"
+                  options={portfolioSelectOptions}
+                  selectedValues={studentExportFilters.portfolioIds}
+                  onChange={(portfolioIds) => setStudentExportFilters({ ...studentExportFilters, portfolioIds })}
                 />
                 <MultiSelectField
                   label="Roles"
@@ -1847,7 +2531,9 @@ export function App() {
                 onChange={(columns) => setStudentExportColumns(columns as StudentExportColumn[])}
               />
             </div>
-          ) : (
+          ) : null}
+
+          {exportTarget === "groups" ? (
             <div className="form-stack">
               <div className="export-filter-grid">
                 <SelectField value={groupExportFilters.studentLevel} onChange={(event) => setGroupExportFilters({ ...groupExportFilters, studentLevel: event.target.value })}>
@@ -1856,7 +2542,7 @@ export function App() {
                   <option value="PREPA">PREPA</option>
                 </SelectField>
                 <SelectField value={groupExportFilters.participationStatus} onChange={(event) => setGroupExportFilters({ ...groupExportFilters, participationStatus: event.target.value as ParticipationExportScope })}>
-                  <option value="active">Participaciones activas</option>
+                  <option value="active">Pertenencias vigentes</option>
                   <option value="all">Todo el historial</option>
                 </SelectField>
                 <MultiSelectField
@@ -1866,10 +2552,16 @@ export function App() {
                   onChange={(groupIds) => setGroupExportFilters({ ...groupExportFilters, groupIds })}
                 />
                 <MultiSelectField
-                  label="Categorias"
-                  options={categorySelectOptions}
-                  selectedValues={groupExportFilters.categoryIds}
-                  onChange={(categoryIds) => setGroupExportFilters({ ...groupExportFilters, categoryIds })}
+                  label="Giros"
+                  options={giroSelectOptions}
+                  selectedValues={groupExportFilters.giroIds}
+                  onChange={(giroIds) => setGroupExportFilters({ ...groupExportFilters, giroIds })}
+                />
+                <MultiSelectField
+                  label="Portafolios"
+                  options={portfolioSelectOptions}
+                  selectedValues={groupExportFilters.portfolioIds}
+                  onChange={(portfolioIds) => setGroupExportFilters({ ...groupExportFilters, portfolioIds })}
                 />
                 <MultiSelectField
                   label="Roles"
@@ -1886,19 +2578,32 @@ export function App() {
                 onChange={(columns) => setGroupExportColumns(columns as GroupExportColumn[])}
               />
             </div>
-          )}
+          ) : null}
+
+          {exportTarget === "memberships" ? (
+            <div className="form-stack export-simple-panel export-memberships-panel">
+              <SelectField value={membershipExportScope} onChange={(event) => setMembershipExportScope(event.target.value as ParticipationExportScope)}>
+                <option value="all">Todas las pertenencias</option>
+                <option value="active">Solo pertenencias vigentes</option>
+              </SelectField>
+            </div>
+          ) : null}
 
           <div className="row-actions">
-            <button onClick={() => void runConfiguredCsvExport()}>Exportar CSV</button>
+            <button onClick={() => void runConfiguredCsvExport()}>
+              {exportTarget === "memberships" ? "Exportar pertenencias CSV" : "Exportar CSV"}
+            </button>
             <button
               className="ghost-button"
               onClick={() => {
                 if (exportTarget === "students") {
                   setStudentExportFilters(defaultStudentExportFilters);
                   setStudentExportColumns(defaultStudentExportColumns);
-                } else {
+                } else if (exportTarget === "groups") {
                   setGroupExportFilters(defaultGroupExportFilters);
                   setGroupExportColumns(defaultGroupExportColumns);
+                } else {
+                  setMembershipExportScope("all");
                 }
               }}
             >
@@ -1968,7 +2673,7 @@ function AuthScreen(props: {
               props.onSubmit();
             }
           }}
-          placeholder="Contrasena"
+          placeholder="Contraseña"
         />
         <button onClick={props.onSubmit} disabled={props.busy}>{props.actionLabel}</button>
         {props.notice ? <p className="success-text">{props.notice}</p> : null}
@@ -1978,10 +2683,12 @@ function AuthScreen(props: {
   );
 }
 
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({ title, onClose, children, className }: { title: string; onClose: () => void; children: ReactNode; className?: string }) {
+  const modalClassName = ["modal-card", className].filter(Boolean).join(" ");
+
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+      <div className={modalClassName} onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button className="ghost-button" onClick={onClose}>Cerrar</button>
@@ -2104,13 +2811,14 @@ function SelectField({
       return options;
     }
 
-    return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
+      return options.filter((option) => option.label.toLowerCase().includes(normalizedQuery));
   }, [options, query]);
   const selectedValue = value == null ? "" : String(value);
   const selectedOption = options.find((option) => option.value === selectedValue) ?? null;
   const selectedLabel = selectedOption?.label ?? "";
   const shellClassNames = [
     compact ? "select-shell compact" : "select-shell",
+    open ? "open" : "",
     shellClassName
   ].filter(Boolean).join(" ");
   const fieldClassName = className ? `select-trigger ${className}` : "select-trigger";
@@ -2269,7 +2977,7 @@ function MultiSelectField(props: {
   }
 
   return (
-    <div className="select-shell" ref={containerRef}>
+    <div className={open ? "select-shell open" : "select-shell"} ref={containerRef}>
       <button type="button" className="select-trigger" onClick={() => setOpen((current) => !current)} aria-haspopup="listbox" aria-expanded={open}>
         <span className={props.selectedValues.length ? "select-trigger-label" : "select-trigger-label muted"}>{summary}</span>
         <span className={open ? "select-caret open" : "select-caret"} aria-hidden="true" />
@@ -2367,11 +3075,202 @@ function DataTable(props: { title: string; headers: string[]; rows: Array<Array<
   );
 }
 
-function StatCard({ label, value, wide = false }: { label: string; value: number; wide?: boolean }) {
+function StatCard({
+  label,
+  value,
+  wide = false,
+  icon,
+  hint,
+  onClick,
+  accent = "default"
+}: {
+  label: string;
+  value: number;
+  wide?: boolean;
+  icon?: DashboardIconName;
+  hint?: string;
+  onClick?: (() => void) | undefined;
+  accent?: "default" | "warm";
+}) {
+  const className = [
+    wide ? "stat-card wide" : "stat-card",
+    onClick ? "stat-card-action" : "",
+    accent === "warm" ? "stat-card-warm" : ""
+  ].filter(Boolean).join(" ");
+
+  const content = (
+    <>
+      <div className="stat-card-top">
+        <span className="stat-card-label">{label}</span>
+        {icon ? (
+          <span className="stat-card-icon" aria-hidden="true">
+            <DashboardIcon name={icon} />
+          </span>
+        ) : null}
+      </div>
+      <strong className="stat-card-value">{value}</strong>
+      {hint ? <span className="stat-card-hint">{hint}</span> : null}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        {content}
+      </button>
+    );
+  }
+
+  return <div className={className}>{content}</div>;
+}
+
+type DashboardSegmentMetrics = {
+  students: number;
+  groups: number;
+  studentsInGroups: number;
+  studentsWithoutGroup: number;
+};
+
+type DashboardIconName = "refresh" | "students" | "groups" | "membership" | "pending";
+
+function DashboardIcon(props: { name: DashboardIconName }) {
+  switch (props.name) {
+    case "refresh":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M21 12a9 9 0 0 1-15.36 6.36" />
+          <path d="M3 12A9 9 0 0 1 18.36 5.64" />
+          <path d="M7 17H5v-2" />
+          <path d="M17 7h2v2" />
+        </svg>
+      );
+    case "students":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2" />
+          <path d="M9.5 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+          <path d="M17 8a3 3 0 0 1 0 6" />
+          <path d="M21 21v-2a3 3 0 0 0-3-3" />
+        </svg>
+      );
+    case "groups":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 21h18" />
+          <path d="M5 21V9l7-4 7 4v12" />
+          <path d="M9 21v-5h6v5" />
+          <path d="M9 11h.01" />
+          <path d="M15 11h.01" />
+        </svg>
+      );
+    case "membership":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="m8.5 12 2.2 2.2 4.8-4.8" />
+        </svg>
+      );
+    case "pending":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
+  }
+}
+
+function DashboardSegmentCard(props: {
+  title: string;
+  segment: DashboardSegmentMetrics | undefined;
+  pendingCount?: number;
+  onPendingClick?: (() => void) | undefined;
+}) {
+  const segment = props.segment ?? { students: 0, groups: 0, studentsInGroups: 0, studentsWithoutGroup: 0 };
+  const isGeneral = typeof props.pendingCount === "number";
+  const stats = [
+    { label: "Estudiantes", value: segment.students, icon: "students" as DashboardIconName },
+    ...(isGeneral ? [{ label: "Grupos", value: segment.groups, icon: "groups" as DashboardIconName }] : []),
+    { label: "Dentro de un grupo", value: segment.studentsInGroups, icon: "membership" as DashboardIconName }
+  ];
+
   return (
-    <div className={wide ? "stat-card wide" : "stat-card"}>
-      <span>{label}</span>
-      <strong>{value}</strong>
+    <div className={`card dashboard-segment-card${isGeneral ? " dashboard-segment-card-featured" : " dashboard-segment-card-compact"}`}>
+      <div className="section-head dashboard-card-head">
+        <div className="dashboard-card-title">
+          <h3>{props.title}</h3>
+        </div>
+      </div>
+      {isGeneral ? (
+        <div className="dashboard-card-inner dashboard-card-inner-general">
+          <div className="stats-strip dashboard-segment-stats dashboard-segment-stats-expanded">
+            {stats.map((stat) => (
+              <StatCard key={`${props.title}-${stat.label}`} label={stat.label} value={stat.value} icon={stat.icon} />
+            ))}
+            <StatCard
+              label="Pendientes por agregar"
+              value={props.pendingCount ?? 0}
+              icon="pending"
+              hint="Abrir lista"
+              onClick={props.onPendingClick}
+              accent="warm"
+            />
+          </div>
+          <MembershipPieChart variant="general" inGroup={segment.studentsInGroups} withoutGroup={segment.studentsWithoutGroup} />
+        </div>
+      ) : (
+        <div className="dashboard-card-inner dashboard-card-inner-compact">
+          <div className="dashboard-compact-body">
+            <MembershipPieChart variant="minimal" inGroup={segment.studentsInGroups} withoutGroup={segment.studentsWithoutGroup} />
+            <div className="dashboard-segment-stats dashboard-segment-stats-rail">
+              {stats.map((stat) => (
+                <StatCard key={`${props.title}-${stat.label}`} label={stat.label} value={stat.value} icon={stat.icon} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MembershipPieChart(props: { variant: "general" | "minimal"; inGroup: number; withoutGroup: number }) {
+  const total = props.inGroup + props.withoutGroup;
+  const percentage = total > 0 ? Math.round((props.inGroup / total) * 100) : 0;
+  const withoutGroupPercentage = total > 0 ? 100 - percentage : 0;
+  const background = total > 0
+    ? `conic-gradient(#1f7a5f 0 ${percentage}%, #f6f8fb ${percentage}% ${Math.min(percentage + 1, 100)}%, #d9534f ${Math.min(percentage + 1, 100)}% 100%)`
+    : "conic-gradient(#d7dde5 0 100%)";
+  const isMinimal = props.variant === "minimal";
+
+  return (
+    <div className={`dashboard-pie-row${isMinimal ? " dashboard-pie-row-minimal" : ""}`}>
+      <div className="dashboard-pie-shell">
+        <div className="dashboard-pie" style={{ background }} aria-label={`${props.inGroup} dentro de un grupo, ${props.withoutGroup} sin grupo`}>
+          <div className="dashboard-pie-center">
+            <strong>{percentage}%</strong>
+            <span>con grupo</span>
+          </div>
+        </div>
+      </div>
+      <div className="dashboard-pie-copy">
+        <div className="dashboard-pie-legend">
+          <div className="dashboard-pie-legend-row">
+            <span className="dashboard-pie-legend-label"><i className="legend-dot in-group" />Dentro</span>
+            <div className="dashboard-pie-legend-values">
+              <strong>{props.inGroup}</strong>
+              <span>{percentage}%</span>
+            </div>
+          </div>
+          <div className="dashboard-pie-legend-row">
+            <span className="dashboard-pie-legend-label"><i className="legend-dot without-group" />Sin grupo</span>
+            <div className="dashboard-pie-legend-values">
+              <strong>{props.withoutGroup}</strong>
+              <span>{withoutGroupPercentage}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2388,6 +3287,15 @@ function formatBulkImportNotice(entityName: string, result: { created: number; f
   }
 
   return `${result.created} ${entityName} creados. ${result.failed} filas con error.`;
+}
+
+function createStudentMembershipDraft(): StudentCreateMembershipDraft {
+  return {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    groupId: "",
+    roleId: "",
+    joinedAt: ""
+  };
 }
 
 function localFileUrl(sourcePath: string): string {
@@ -2411,12 +3319,24 @@ function getViewLabel(view: View): string {
   }
 }
 
+function getPendingMembershipStatusLabel(status: string): string {
+  if (status === "RESOLVED") {
+    return "Resuelto";
+  }
+  if (status === "CANCELLED") {
+    return "Cancelado";
+  }
+  return "Pendiente";
+}
+
 function getCatalogModalTitle(type: CatalogType, editing: boolean): string {
   const prefix = editing ? "Editar" : "Nuevo";
 
   switch (type) {
-    case "category":
-      return `${prefix} categoria`;
+    case "giro":
+      return `${prefix} giro`;
+    case "portfolio":
+      return editing ? "Editar portafolio" : "Nuevo portafolio";
     case "role":
       return `${prefix} rol`;
     case "career":
@@ -2428,8 +3348,10 @@ function getCatalogModalTitle(type: CatalogType, editing: boolean): string {
 
 function getCatalogSectionTitle(type: CatalogType): string {
   switch (type) {
-    case "category":
-      return "Categorias";
+    case "giro":
+      return "Giros";
+    case "portfolio":
+      return "Portafolios";
     case "role":
       return "Roles";
     case "career":
@@ -2441,7 +3363,9 @@ function getCatalogSectionTitle(type: CatalogType): string {
 
 function getStudentAcademicLabel(student: Student): string {
   if (student.nivel === "PROFESIONAL") {
-    return `Carrera: ${student.career?.name ?? "Sin carrera"}`;
+    return student.academicPending
+      ? "Carrera: pendiente"
+      : `Carrera: ${student.career?.name ?? "Sin carrera"}`;
   }
 
   return `Programa: ${student.prepaProgram?.name ?? "Sin programa"}`;
@@ -2451,7 +3375,10 @@ function getErrorMessage(error: unknown): string {
   if (error && typeof error === "object") {
     const maybeError = error as { message?: string };
     if (maybeError.message) {
-      return maybeError.message;
+      return maybeError.message
+        .replace(/^Error invoking remote method '[^']+':\s*/i, "")
+        .replace(/^(?:(?:[A-Z][A-Za-z]*Error|Error):\s*)+/, "")
+        .trim();
     }
   }
 
@@ -2520,8 +3447,12 @@ function getNodeText(node: ReactNode): string {
   return "";
 }
 
-function getGroupCategoryName(group: { category?: { name: string } | null }): string {
-  return group.category?.name ?? "Sin categoria";
+function getGroupGiroName(group: { giro?: { name: string } | null }): string {
+  return group.giro?.name ?? "Sin giro";
+}
+
+function getGroupPortfolioName(group: { portfolio?: { name: string } | null }): string {
+  return group.portfolio?.name ?? "Sin portafolio";
 }
 
 function getMembershipRoleName(membership: { role?: { name: string } | null }): string {

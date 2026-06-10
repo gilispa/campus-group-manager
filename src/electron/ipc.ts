@@ -5,7 +5,12 @@ import { dialog, ipcMain, type IpcMainInvokeEvent } from "electron";
 import { appPaths, uploadPrefixes } from "../config/paths";
 import { createBackendServices } from "../main/container";
 import type { IpcChannel, IpcChannelMap } from "../types/ipc";
-import type { GroupExportColumn, StudentExportColumn } from "../types/domain";
+import type {
+  GroupExportColumn,
+  MembershipCsvExportInput,
+  ReportExportKind,
+  StudentExportColumn
+} from "../types/domain";
 import { AuthenticationError } from "../utils/errors";
 
 type Handler<K extends IpcChannel> = (input: IpcChannelMap[K]["input"], event: IpcMainInvokeEvent) => Promise<IpcChannelMap[K]["output"]>;
@@ -31,7 +36,8 @@ const defaultStudentExportColumns: StudentExportColumn[] = [
 ];
 const defaultGroupExportColumns: GroupExportColumn[] = [
   "nombre",
-  "category",
+  "giro",
+  "portfolio",
   "descripcion",
   "activeStudents",
   "activeStudentCount",
@@ -60,7 +66,8 @@ const studentExportLabels: Record<StudentExportColumn, string> = {
 };
 const groupExportLabels: Record<GroupExportColumn, string> = {
   nombre: "Nombre",
-  category: "Categoria",
+  giro: "Giro",
+  portfolio: "Portafolio",
   descripcion: "Descripcion",
   activeStudents: "Estudiantes activos",
   activeMatriculas: "Matriculas activas",
@@ -71,7 +78,18 @@ const groupExportLabels: Record<GroupExportColumn, string> = {
   updatedAt: "Actualizado"
 };
 const studentImportHeaders = ["Nombre", "Matricula", "Nivel", "Carrera", "Programa prepa", "Generacion", "Email", "Telefono", "Notas", "Activo"];
-const groupImportHeaders = ["Nombre", "Categoria", "Descripcion"];
+const groupImportHeaders = ["Nombre", "Giro", "Portafolio", "Descripcion"];
+const membershipImportHeaders = ["Matricula", "Grupo", "Rol", "FechaIngreso", "FechaSalida", "Activo"];
+const reportLabelByKind: Record<ReportExportKind, string> = {
+  participations: "reporte-pertenencias.csv",
+  studentsWithoutActiveGroup: "reporte-estudiantes-sin-grupo.csv",
+  groupsWithoutLeader: "reporte-grupos-sin-lider.csv",
+  groupsWithLowMembership: "reporte-grupos-baja-pertenencia.csv",
+  emptyCategories: "reporte-giros-vacios.csv",
+  unusedRoles: "reporte-roles-sin-uso.csv",
+  inactiveStudentsWithActiveMembership: "reporte-estudiantes-inactivos-con-pertenencia.csv",
+  groupSummary: "reporte-resumen-grupos.csv"
+};
 
 export function registerIpcHandlers(): void {
   const services = createBackendServices();
@@ -109,6 +127,24 @@ export function registerIpcHandlers(): void {
     "categories:getById": async (input) => services.categoryService.getCategoryById(input.id),
     "categories:list": async () => services.categoryService.listCategories(),
     "categories:listDeleted": async () => services.categoryService.listDeletedCategories(),
+
+    "giros:create": async (input) => services.giroService.createCategory(input),
+    "giros:update": async (input) => services.giroService.updateCategory(input.id, input.data),
+    "giros:delete": async (input) => services.giroService.deleteCategory(input.id),
+    "giros:permanentDelete": async (input) => services.giroService.permanentlyDeleteCategory(input.id),
+    "giros:restore": async (input) => services.giroService.restoreCategory(input.id),
+    "giros:getById": async (input) => services.giroService.getCategoryById(input.id),
+    "giros:list": async () => services.giroService.listCategories(),
+    "giros:listDeleted": async () => services.giroService.listDeletedCategories(),
+
+    "portfolios:create": async (input) => services.portfolioService.createPortfolio(input),
+    "portfolios:update": async (input) => services.portfolioService.updatePortfolio(input.id, input.data),
+    "portfolios:delete": async (input) => services.portfolioService.deletePortfolio(input.id),
+    "portfolios:permanentDelete": async (input) => services.portfolioService.permanentlyDeletePortfolio(input.id),
+    "portfolios:restore": async (input) => services.portfolioService.restorePortfolio(input.id),
+    "portfolios:getById": async (input) => services.portfolioService.getPortfolioById(input.id),
+    "portfolios:list": async () => services.portfolioService.listPortfolios(),
+    "portfolios:listDeleted": async () => services.portfolioService.listDeletedPortfolios(),
 
     "roles:create": async (input) => services.roleService.createRole(input),
     "roles:update": async (input) => services.roleService.updateRole(input.id, input.data),
@@ -165,7 +201,7 @@ export function registerIpcHandlers(): void {
 
           const activeGroupNames = activeMemberships.map((membership) => membership.group.nombre);
           const activeRoleNames = Array.from(new Set(activeMemberships.map((membership) => membership.role?.name ?? "Sin rol")));
-          const values: Record<StudentExportColumn, string | number | Date> = {
+          const values: Record<StudentExportColumn, string | number | Date | null> = {
             nombre: student.nombre,
             matricula: student.matricula,
             nivel: student.nivel,
@@ -246,6 +282,7 @@ export function registerIpcHandlers(): void {
       return result.canceled ? null : (result.filePaths[0] ?? null);
     },
     "students:savePhoto": async (input) => services.studentService.saveStudentPhoto(input.sourcePath, input.currentPhoto),
+    "students:graduate": async (input) => services.studentService.graduateStudents(input),
 
     "groups:create": async (input) => services.groupService.createGroup(input),
     "groups:update": async (input) => services.groupService.updateGroup(input.id, input.data),
@@ -268,10 +305,11 @@ export function registerIpcHandlers(): void {
           const activeMatriculas = activeMembers.map((membership) => membership.student.matricula);
           const activeEmails = activeMembers.map((membership) => membership.student.email ?? "").filter(Boolean);
           const activeRoles = Array.from(new Set(activeMembers.map((membership) => membership.role?.name ?? "Sin rol")));
-          const groupWithCategory = group as typeof group & { category?: { name: string } | null };
+          const groupWithCatalogs = group as typeof group & { giro?: { name: string } | null; portfolio?: { name: string } | null };
           const values: Record<GroupExportColumn, string | number | Date> = {
             nombre: group.nombre,
-            category: groupWithCategory.category?.name ?? "Sin categoria",
+            giro: groupWithCatalogs.giro?.name ?? "Sin giro",
+            portfolio: groupWithCatalogs.portfolio?.name ?? "Sin portafolio",
             descripcion: group.descripcion ?? "",
             activeStudents: activeStudentNames.join("; "),
             activeMatriculas: activeMatriculas.join("; "),
@@ -293,22 +331,30 @@ export function registerIpcHandlers(): void {
       }
 
       const rows = parseCsv(await fs.readFile(filePath, "utf8"));
-      const categories = await services.categoryService.listCategories();
-      const categoryByName = createNameLookup(categories);
+      const giros = await services.giroService.listCategories();
+      const portfolios = await services.portfolioService.listPortfolios();
+      const giroByName = createNameLookup(giros);
+      const portfolioByName = createNameLookup(portfolios);
       const result = { created: 0, failed: 0, errors: [] as string[] };
 
       for (const [index, row] of rows.entries()) {
         const lineNumber = index + 2;
         try {
-          const categoryName = getCsvValue(row, "Categoria");
-          const category = categoryByName.get(normalizeLookupKey(categoryName));
-          if (!category) {
-            throw new Error(`La categoria "${categoryName}" no existe.`);
+          const giroName = getCsvValue(row, "Giro");
+          const portfolioName = getCsvValue(row, "Portafolio");
+          const giro = giroByName.get(normalizeLookupKey(giroName));
+          const portfolio = portfolioByName.get(normalizeLookupKey(portfolioName));
+          if (!giro) {
+            throw new Error(`El giro "${giroName}" no existe.`);
+          }
+          if (!portfolio) {
+            throw new Error(`El portafolio "${portfolioName}" no existe.`);
           }
 
           await services.groupService.createGroup({
             nombre: getCsvValue(row, "Nombre"),
-            categoryId: category.id,
+            giroId: giro.id,
+            portfolioId: portfolio.id,
             descripcion: optionalCsvValue(row, "Descripcion")
           });
           result.created += 1;
@@ -337,6 +383,68 @@ export function registerIpcHandlers(): void {
     "memberships:listStudentsOfGroup": async (input) => services.studentGroupService.listStudentsOfGroup(input.groupId),
     "memberships:historyByStudent": async (input) => services.studentGroupService.getParticipationHistoryByStudent(input.studentId),
     "memberships:historyByGroup": async (input) => services.studentGroupService.getParticipationHistoryByGroup(input.groupId),
+    "memberships:exportCsv": async (input) => {
+      const rows = await services.studentGroupService.listMembershipsForCsvExport(input);
+      return exportCsv("pertenencias.csv", [
+        ["Matricula", "Estudiante", "Grupo", "Giro", "Portafolio", "Rol", "Ingreso", "Salida", "Vigente"],
+        ...rows.map((membership) => [
+          membership.student.matricula,
+          membership.student.nombre,
+          membership.group.nombre,
+          membership.group.giro?.name ?? "Sin giro",
+          membership.group.portfolio?.name ?? "Sin portafolio",
+          membership.role?.name ?? "Sin rol",
+          membership.joinedAt,
+          membership.leftAt,
+          membership.active ? "Si" : "No"
+        ])
+      ]);
+    },
+    "memberships:exportTemplateCsv": async () => exportCsv("plantilla-pertenencias.csv", [membershipImportHeaders]),
+    "memberships:importCsv": async () => {
+      const filePath = await pickCsvImportFile();
+      if (!filePath) {
+        return { created: 0, failed: 0, errors: [] };
+      }
+
+      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      return services.studentGroupService.importMemberships(
+        rows.map((row) => {
+          return {
+            matricula: getCsvValue(row, "Matricula"),
+            groupName: getCsvValue(row, "Grupo"),
+            roleName: optionalCsvValue(row, "Rol"),
+            joinedAt: optionalCsvValue(row, "FechaIngreso"),
+            leftAt: optionalCsvValue(row, "FechaSalida"),
+            active: parseOptionalBoolean(getCsvValue(row, "Activo"))
+          };
+        })
+      );
+    },
+
+    "groupManagement:exportTemplateXlsx": async (input) => {
+      const result = await dialog.showSaveDialog({
+        defaultPath: "plantilla-cambio-gestion.xlsx",
+        filters: [{ name: "Excel", extensions: ["xlsx"] }]
+      });
+      if (result.canceled || !result.filePath) {
+        return null;
+      }
+
+      return services.groupManagementService.exportTemplate(input.groupId, result.filePath);
+    },
+    "groupManagement:previewImportXlsx": async (input) => {
+      const filePath = await pickXlsxImportFile();
+      if (!filePath) {
+        return { filePath: null, rows: [], ready: 0, pending: 0, errors: 0 };
+      }
+
+      return services.groupManagementService.previewImport(input.groupId, filePath);
+    },
+    "groupManagement:applyImportXlsx": async (input) => services.groupManagementService.applyImport(input),
+
+    "pendingMemberships:list": async (input) => services.pendingMembershipService.listPendingMemberships(input),
+    "pendingMemberships:cancel": async (input) => services.pendingMembershipService.cancelPendingMembership(input.id),
 
     "backup:export": async (input) => services.backupService.exportDatabase(input.destinationFilePath),
     "backup:import": async (input) => services.backupService.importDatabase(input.sourceFilePath),
@@ -363,6 +471,8 @@ export function registerIpcHandlers(): void {
     },
 
     "meta:summary": async () => services.metaService.getSummary(),
+    "meta:operationalSummary": async () => services.metaService.getOperationalSummary(),
+    "reports:exportCsv": async (input) => exportOperationalReportCsv(input.kind, services),
     "meta:resolveAssetUrl": async (input) => resolveAssetUrl(input.assetPath),
     "meta:resolveDroppedPath": async (input) => resolveDroppedPath(input.candidatePath, input.kind)
   };
@@ -428,6 +538,15 @@ async function pickCsvImportFile(): Promise<string | null> {
   const result = await dialog.showOpenDialog({
     properties: ["openFile"],
     filters: [{ name: "CSV", extensions: ["csv"] }]
+  });
+
+  return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
+async function pickXlsxImportFile(): Promise<string | null> {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [{ name: "Excel", extensions: ["xlsx"] }]
   });
 
   return result.canceled ? null : (result.filePaths[0] ?? null);
@@ -576,4 +695,98 @@ async function exportCsv(defaultPath: string, rows: Array<Array<string | number 
 function csvCell(value: string | number | boolean | Date | null | undefined): string {
   const normalized = value instanceof Date ? value.toISOString() : String(value ?? "");
   return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+async function exportOperationalReportCsv(
+  kind: ReportExportKind,
+  services: ReturnType<typeof createBackendServices>
+): Promise<string | null> {
+  const operational = await services.metaService.getOperationalSummary();
+  if (kind === "participations") {
+    const rows = await services.studentGroupService.listMembershipsForCsvExport({ participationStatus: "all" });
+    return exportCsv(reportLabelByKind[kind], [
+      ["Matricula", "Estudiante", "Grupo", "Giro", "Portafolio", "Rol", "Ingreso", "Salida", "Vigente"],
+      ...rows.map((membership) => [
+        membership.student.matricula,
+        membership.student.nombre,
+        membership.group.nombre,
+        membership.group.giro?.name ?? "Sin giro",
+        membership.group.portfolio?.name ?? "Sin portafolio",
+        membership.role?.name ?? "Sin rol",
+        membership.joinedAt,
+        membership.leftAt,
+        membership.active ? "Si" : "No"
+      ])
+    ]);
+  }
+
+  if (kind === "studentsWithoutActiveGroup") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Matricula", "Nombre"],
+      ...operational.studentAlerts.map((student) => [student.matricula, student.nombre])
+    ]);
+  }
+
+  if (kind === "groupsWithoutLeader") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Grupo", "Miembros activos"],
+      ...operational.groupsWithoutLeaderRows.map((group) => [group.nombre, group.activeMembers])
+    ]);
+  }
+
+  if (kind === "groupsWithLowMembership") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Grupo", "Miembros activos"],
+      ...operational.groupsWithLowMembershipRows.map((group) => [group.nombre, group.activeMembers])
+    ]);
+  }
+
+  if (kind === "emptyCategories") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Giro"],
+      ...operational.emptyCategoryRows.map((giro) => [giro.name])
+    ]);
+  }
+
+  if (kind === "unusedRoles") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Rol"],
+      ...operational.unusedRoleRows.map((role) => [role.name])
+    ]);
+  }
+
+  if (kind === "inactiveStudentsWithActiveMembership") {
+    return exportCsv(reportLabelByKind[kind], [
+      ["Matricula", "Nombre"],
+      ...operational.inactiveStudentRows.map((student) => [student.matricula, student.nombre])
+    ]);
+  }
+
+  const groups = await services.groupService.listGroups();
+  const groupRows = await Promise.all(groups.map(async (group) => {
+    const groupWithCatalogs = group as typeof group & { giro?: { name: string } | null; portfolio?: { name: string } | null };
+    const memberships = await services.studentGroupService.listStudentsOfGroup(group.id);
+    const activeMembers = memberships.filter((membership) => membership.active && membership.student.deletedAt === null);
+    const hasLeader = activeMembers.some((membership) => {
+      const roleName = membership.role?.name ?? "";
+      const normalized = roleName
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+      return normalized === "lider" || normalized === "presidente" || normalized === "coordinador";
+    });
+
+    return [
+      group.nombre,
+      groupWithCatalogs.giro?.name ?? "Sin giro",
+      groupWithCatalogs.portfolio?.name ?? "Sin portafolio",
+      activeMembers.length,
+      hasLeader ? "Si" : "No"
+    ];
+  }));
+  return exportCsv(reportLabelByKind[kind], [
+    ["Grupo", "Giro", "Portafolio", "Miembros vigentes", "Tiene lider"],
+    ...groupRows
+  ]);
 }

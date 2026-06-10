@@ -11,7 +11,7 @@ export class CategoryRepository {
       ...(data.description !== undefined ? { description: data.description } : {})
     };
 
-    return this.prisma.category.create({ data: createData });
+    return this.prisma.giro.create({ data: createData });
   }
 
   async update(id: string, data: CategoryUpdateInput): Promise<Category> {
@@ -20,44 +20,44 @@ export class CategoryRepository {
       ...(data.description !== undefined ? { description: data.description } : {})
     };
 
-    return this.prisma.category.update({ where: { id }, data: updateData });
+    return this.prisma.giro.update({ where: { id }, data: updateData });
   }
 
   async delete(id: string): Promise<Category> {
-    return this.prisma.category.update({ where: { id }, data: { deletedAt: new Date() } });
+    return this.prisma.giro.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 
   async findById(id: string): Promise<Category | null> {
-    return this.prisma.category.findFirst({ where: { id, deletedAt: null } });
+    return this.prisma.giro.findFirst({ where: { id, deletedAt: null } });
   }
 
   async findByName(name: string): Promise<Category | null> {
-    return this.prisma.category.findUnique({ where: { name } });
+    return this.prisma.giro.findUnique({ where: { name } });
   }
 
   async list(): Promise<Category[]> {
-    return this.prisma.category.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } });
+    return this.prisma.giro.findMany({ where: { deletedAt: null }, orderBy: { name: "asc" } });
   }
 
   async countGroups(id: string): Promise<number> {
-    return this.prisma.group.count({ where: { categoryId: id, deletedAt: null } });
+    return this.prisma.group.count({ where: { giroId: id, deletedAt: null } });
   }
 
   async listDeleted(): Promise<Category[]> {
-    return this.prisma.category.findMany({ where: { deletedAt: { not: null } }, orderBy: { deletedAt: "desc" } });
+    return this.prisma.giro.findMany({ where: { deletedAt: { not: null } }, orderBy: { deletedAt: "desc" } });
   }
 
   async restore(id: string): Promise<Category> {
-    return this.prisma.category.update({ where: { id }, data: { deletedAt: null } });
+    return this.prisma.giro.update({ where: { id }, data: { deletedAt: null } });
   }
 
   async permanentDelete(id: string): Promise<Category> {
-    const deleted = await this.prisma.category.findFirst({ where: { id, deletedAt: { not: null } } });
+    const deleted = await this.prisma.giro.findFirst({ where: { id, deletedAt: { not: null } } });
     if (!deleted) {
       throw new Error("NOT_FOUND_OR_NOT_DELETED");
     }
 
-    await this.prisma.category.delete({ where: { id } });
+    await this.prisma.giro.delete({ where: { id } });
     return deleted;
   }
 }

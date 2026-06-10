@@ -40,7 +40,7 @@ export function assertPositiveInteger(value: number, field: string): number {
 
 export function assertPasswordStrength(password: string): string {
   if (password.trim().length < 8) {
-    throw new ValidationError("La contrasena debe tener al menos 8 caracteres.");
+    throw new ValidationError("La contraseña debe tener al menos 8 caracteres.");
   }
 
   return password;

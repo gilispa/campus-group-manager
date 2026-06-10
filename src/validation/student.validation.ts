@@ -17,6 +17,7 @@ function normalizeEmail(value: string | undefined | null): string | null | undef
 
 function normalizeAcademicLinks(
   level: StudentLevelType,
+  academicPending: boolean,
   careerId?: string | null,
   prepaProgramId?: string | null
 ): { careerId: string | null; prepaProgramId: string | null } {
@@ -24,6 +25,13 @@ function normalizeAcademicLinks(
   const normalizedPrepaProgramId = assertOptionalString(prepaProgramId);
 
   if (level === StudentLevel.PROFESIONAL) {
+    if (academicPending) {
+      return {
+        careerId: normalizedCareerId ?? null,
+        prepaProgramId: null
+      };
+    }
+
     if (!normalizedCareerId) {
       throw new ValidationError("La carrera es requerida para estudiantes de nivel PROFESIONAL.");
     }
@@ -44,11 +52,24 @@ function normalizeAcademicLinks(
   };
 }
 
+function normalizeGeneration(value: number | null | undefined, academicPending: boolean): number | null {
+  if (value === null || value === undefined) {
+    if (academicPending) {
+      return null;
+    }
+
+    throw new ValidationError("La generacion es requerida.");
+  }
+
+  return assertPositiveInteger(value, "La generacion");
+}
+
 export function validateStudentCreate(input: StudentCreateInput): StudentCreateInput {
   const nombre = assertNonEmptyString(input.nombre, "El nombre");
   const matricula = assertNonEmptyString(input.matricula, "La matricula");
-  const generacion = assertPositiveInteger(input.generacion, "La generacion");
-  const academicLinks = normalizeAcademicLinks(input.nivel, input.careerId, input.prepaProgramId);
+  const academicPending = input.academicPending ?? false;
+  const generacion = normalizeGeneration(input.generacion, academicPending);
+  const academicLinks = normalizeAcademicLinks(input.nivel, academicPending, input.careerId, input.prepaProgramId);
   const foto = assertLocalUploadPath(input.foto, uploadPrefixes.students, "La foto");
 
   return {
@@ -56,6 +77,7 @@ export function validateStudentCreate(input: StudentCreateInput): StudentCreateI
     nombre,
     matricula,
     generacion,
+    academicPending,
     ...academicLinks,
     foto,
     telefono: assertOptionalString(input.telefono),
@@ -65,19 +87,21 @@ export function validateStudentCreate(input: StudentCreateInput): StudentCreateI
 }
 
 export function validateStudentUpdate(
-  current: { nivel: StudentLevelType; careerId: string | null; prepaProgramId: string | null },
+  current: { nivel: StudentLevelType; careerId: string | null; prepaProgramId: string | null; academicPending: boolean },
   input: StudentUpdateInput
 ): StudentUpdateInput {
   const nextLevel = input.nivel ?? current.nivel;
   const nextCareerId = input.careerId !== undefined ? input.careerId : current.careerId;
   const nextPrepaProgramId = input.prepaProgramId !== undefined ? input.prepaProgramId : current.prepaProgramId;
-  const academicLinks = normalizeAcademicLinks(nextLevel, nextCareerId, nextPrepaProgramId);
+  const nextAcademicPending = input.academicPending ?? current.academicPending;
+  const academicLinks = normalizeAcademicLinks(nextLevel, nextAcademicPending, nextCareerId, nextPrepaProgramId);
 
   return {
     ...input,
     ...(input.nombre !== undefined ? { nombre: assertNonEmptyString(input.nombre, "El nombre") } : {}),
     ...(input.matricula !== undefined ? { matricula: assertNonEmptyString(input.matricula, "La matricula") } : {}),
-    ...(input.generacion !== undefined ? { generacion: assertPositiveInteger(input.generacion, "La generacion") } : {}),
+    ...(input.generacion !== undefined ? { generacion: normalizeGeneration(input.generacion, nextAcademicPending) } : {}),
+    ...(input.academicPending !== undefined ? { academicPending: nextAcademicPending } : {}),
     ...(input.foto !== undefined
       ? { foto: assertLocalUploadPath(input.foto, uploadPrefixes.students, "La foto") }
       : {}),
@@ -100,7 +124,8 @@ export function validateStudentSearchFilters(filters: StudentSearchFilters): Stu
     ...(filters.roleId ? { roleId: filters.roleId.trim() } : {}),
     ...(filters.roleIds ? { roleIds: normalizeStringList(filters.roleIds) } : {}),
     ...(filters.groupIds ? { groupIds: normalizeStringList(filters.groupIds) } : {}),
-    ...(filters.categoryIds ? { categoryIds: normalizeStringList(filters.categoryIds) } : {}),
+    ...(filters.giroIds ? { giroIds: normalizeStringList(filters.giroIds) } : {}),
+    ...(filters.portfolioIds ? { portfolioIds: normalizeStringList(filters.portfolioIds) } : {}),
     ...(filters.participationStatus ? { participationStatus: filters.participationStatus } : {}),
     ...(filters.activo !== undefined ? { activo: filters.activo } : {})
   };

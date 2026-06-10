@@ -14,7 +14,7 @@ export class CategoryService {
       return await this.repository.create(data);
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "P2002") {
-        throw new ConflictError("Ya existe una categoria con ese nombre.");
+        throw new ConflictError("Ya existe un giro con ese nombre.");
       }
 
       throw error;
@@ -29,7 +29,7 @@ export class CategoryService {
       return await this.repository.update(id, data);
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "P2002") {
-        throw new ConflictError("Ya existe una categoria con ese nombre.");
+        throw new ConflictError("Ya existe un giro con ese nombre.");
       }
 
       throw error;
@@ -50,7 +50,7 @@ export class CategoryService {
       return await this.repository.permanentDelete(id);
     } catch (error) {
       if (error instanceof Error && error.message === "NOT_FOUND_OR_NOT_DELETED") {
-        throw new NotFoundError("La categoria no esta en la papelera.");
+        throw new NotFoundError("El giro no esta en la papelera.");
       }
       throw error;
     }
@@ -71,7 +71,7 @@ export class CategoryService {
   private async ensureCategoryExists(id: string) {
     const category = await this.repository.findById(id);
     if (!category) {
-      throw new NotFoundError("Categoria no encontrada.");
+      throw new NotFoundError("Giro no encontrado.");
     }
 
     return category;

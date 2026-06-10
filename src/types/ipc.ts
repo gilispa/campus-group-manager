@@ -1,15 +1,31 @@
 import type {
   AddStudentToGroupInput,
   AdminLoginInput,
+  ApplyGroupManagementInput,
   BulkImportResult,
   CareerCreateInput,
   CareerUpdateInput,
   CategoryCreateInput,
   CategoryUpdateInput,
   ChangeMembershipRoleInput,
+  DashboardSummary,
+  GiroCreateInput,
+  GiroUpdateInput,
+  GraduateStudentsInput,
+  GraduateStudentsResult,
+  GroupManagementApplyResult,
+  GroupManagementImportPreviewInput,
+  GroupManagementPreview,
+  GroupManagementTemplateInput,
+  ReportCsvExportInput,
   GroupCsvExportInput,
   GroupCreateInput,
   GroupSearchFilters,
+  MembershipCsvExportInput,
+  OperationalSummary,
+  PendingMembershipSearchFilters,
+  PortfolioCreateInput,
+  PortfolioUpdateInput,
   PrepaProgramCreateInput,
   PrepaProgramUpdateInput,
   GroupUpdateInput,
@@ -20,7 +36,8 @@ import type {
   StudentCreateInput,
   StudentCsvExportInput,
   StudentSearchFilters,
-  StudentUpdateInput
+  StudentUpdateInput,
+  UpdateAdminPasswordInput
 } from "./domain";
 
 export interface AdminStatus {
@@ -28,18 +45,12 @@ export interface AdminStatus {
   authenticated: boolean;
 }
 
-export interface AppMetaSummary {
-  students: number;
-  groups: number;
-  categories: number;
-  roles: number;
-  activeMemberships: number;
-}
+export type AppMetaSummary = DashboardSummary;
 
 export interface IpcChannelMap {
   "auth:status": { input: void; output: AdminStatus };
   "auth:setInitialPassword": { input: SetAdminPasswordInput; output: { id: string } };
-  "auth:updatePassword": { input: SetAdminPasswordInput; output: { id: string } };
+  "auth:updatePassword": { input: UpdateAdminPasswordInput; output: { id: string } };
   "auth:login": { input: AdminLoginInput; output: { success: boolean; message: string } };
   "auth:logout": { input: void; output: { success: boolean } };
   "auth:verifyPassword": { input: { password: string }; output: boolean };
@@ -52,6 +63,24 @@ export interface IpcChannelMap {
   "categories:getById": { input: { id: string }; output: unknown };
   "categories:list": { input: void; output: unknown[] };
   "categories:listDeleted": { input: void; output: unknown[] };
+
+  "giros:create": { input: GiroCreateInput; output: unknown };
+  "giros:update": { input: { id: string; data: GiroUpdateInput }; output: unknown };
+  "giros:delete": { input: { id: string }; output: unknown };
+  "giros:permanentDelete": { input: { id: string }; output: unknown };
+  "giros:restore": { input: { id: string }; output: unknown };
+  "giros:getById": { input: { id: string }; output: unknown };
+  "giros:list": { input: void; output: unknown[] };
+  "giros:listDeleted": { input: void; output: unknown[] };
+
+  "portfolios:create": { input: PortfolioCreateInput; output: unknown };
+  "portfolios:update": { input: { id: string; data: PortfolioUpdateInput }; output: unknown };
+  "portfolios:delete": { input: { id: string }; output: unknown };
+  "portfolios:permanentDelete": { input: { id: string }; output: unknown };
+  "portfolios:restore": { input: { id: string }; output: unknown };
+  "portfolios:getById": { input: { id: string }; output: unknown };
+  "portfolios:list": { input: void; output: unknown[] };
+  "portfolios:listDeleted": { input: void; output: unknown[] };
 
   "roles:create": { input: RoleCreateInput; output: unknown };
   "roles:update": { input: { id: string; data: RoleUpdateInput }; output: unknown };
@@ -94,6 +123,7 @@ export interface IpcChannelMap {
   "students:importCsv": { input: void; output: BulkImportResult };
   "students:pickPhoto": { input: void; output: string | null };
   "students:savePhoto": { input: { sourcePath: string; currentPhoto?: string | null }; output: string };
+  "students:graduate": { input: GraduateStudentsInput; output: GraduateStudentsResult };
 
   "groups:create": { input: GroupCreateInput; output: unknown };
   "groups:update": { input: { id: string; data: GroupUpdateInput }; output: unknown };
@@ -118,6 +148,16 @@ export interface IpcChannelMap {
   "memberships:listStudentsOfGroup": { input: { groupId: string }; output: unknown[] };
   "memberships:historyByStudent": { input: { studentId: string }; output: unknown[] };
   "memberships:historyByGroup": { input: { groupId: string }; output: unknown[] };
+  "memberships:exportCsv": { input: MembershipCsvExportInput; output: string | null };
+  "memberships:exportTemplateCsv": { input: void; output: string | null };
+  "memberships:importCsv": { input: void; output: BulkImportResult };
+
+  "groupManagement:exportTemplateXlsx": { input: GroupManagementTemplateInput; output: string | null };
+  "groupManagement:previewImportXlsx": { input: GroupManagementImportPreviewInput; output: GroupManagementPreview };
+  "groupManagement:applyImportXlsx": { input: ApplyGroupManagementInput; output: GroupManagementApplyResult };
+
+  "pendingMemberships:list": { input: PendingMembershipSearchFilters; output: unknown[] };
+  "pendingMemberships:cancel": { input: { id: string }; output: unknown };
 
   "backup:export": { input: { destinationFilePath: string }; output: string };
   "backup:import": { input: { sourceFilePath: string }; output: string };
@@ -125,6 +165,8 @@ export interface IpcChannelMap {
   "backup:pickImportPath": { input: void; output: string | null };
 
   "meta:summary": { input: void; output: AppMetaSummary };
+  "meta:operationalSummary": { input: void; output: OperationalSummary };
+  "reports:exportCsv": { input: ReportCsvExportInput; output: string | null };
   "meta:resolveAssetUrl": { input: { assetPath: string | null | undefined }; output: string | null };
   "meta:resolveDroppedPath": { input: { candidatePath: string; kind: "student" | "group" }; output: string | null };
 }
@@ -135,7 +177,7 @@ export interface DesktopApi {
   auth: {
     getStatus(): Promise<AdminStatus>;
     setInitialPassword(input: SetAdminPasswordInput): Promise<{ id: string }>;
-    updatePassword(input: SetAdminPasswordInput): Promise<{ id: string }>;
+    updatePassword(input: UpdateAdminPasswordInput): Promise<{ id: string }>;
     login(input: AdminLoginInput): Promise<{ success: boolean; message: string }>;
     logout(): Promise<{ success: boolean }>;
     verifyPassword(password: string): Promise<boolean>;
@@ -143,6 +185,26 @@ export interface DesktopApi {
   categories: {
     create(input: CategoryCreateInput): Promise<unknown>;
     update(id: string, data: CategoryUpdateInput): Promise<unknown>;
+    remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
+    restore(id: string): Promise<unknown>;
+    getById(id: string): Promise<unknown>;
+    list(): Promise<unknown[]>;
+    listDeleted(): Promise<unknown[]>;
+  };
+  giros: {
+    create(input: GiroCreateInput): Promise<unknown>;
+    update(id: string, data: GiroUpdateInput): Promise<unknown>;
+    remove(id: string): Promise<unknown>;
+    permanentDelete(id: string): Promise<unknown>;
+    restore(id: string): Promise<unknown>;
+    getById(id: string): Promise<unknown>;
+    list(): Promise<unknown[]>;
+    listDeleted(): Promise<unknown[]>;
+  };
+  portfolios: {
+    create(input: PortfolioCreateInput): Promise<unknown>;
+    update(id: string, data: PortfolioUpdateInput): Promise<unknown>;
     remove(id: string): Promise<unknown>;
     permanentDelete(id: string): Promise<unknown>;
     restore(id: string): Promise<unknown>;
@@ -195,6 +257,7 @@ export interface DesktopApi {
     importCsv(): Promise<BulkImportResult>;
     pickPhoto(): Promise<string | null>;
     savePhoto(sourcePath: string, currentPhoto?: string | null): Promise<string>;
+    graduate(input: GraduateStudentsInput): Promise<GraduateStudentsResult>;
   };
   groups: {
     create(input: GroupCreateInput): Promise<unknown>;
@@ -221,6 +284,18 @@ export interface DesktopApi {
     listStudentsOfGroup(groupId: string): Promise<unknown[]>;
     historyByStudent(studentId: string): Promise<unknown[]>;
     historyByGroup(groupId: string): Promise<unknown[]>;
+    exportCsv(input: MembershipCsvExportInput): Promise<string | null>;
+    exportTemplateCsv(): Promise<string | null>;
+    importCsv(): Promise<BulkImportResult>;
+  };
+  groupManagement: {
+    exportTemplateXlsx(groupId: string): Promise<string | null>;
+    previewImportXlsx(groupId: string): Promise<GroupManagementPreview>;
+    applyImportXlsx(input: ApplyGroupManagementInput): Promise<GroupManagementApplyResult>;
+  };
+  pendingMemberships: {
+    list(filters?: PendingMembershipSearchFilters): Promise<unknown[]>;
+    cancel(id: string): Promise<unknown>;
   };
   backup: {
     exportDatabase(destinationFilePath: string): Promise<string>;
@@ -230,8 +305,12 @@ export interface DesktopApi {
   };
   meta: {
     getSummary(): Promise<AppMetaSummary>;
+    getOperationalSummary(): Promise<OperationalSummary>;
     resolveAssetUrl(assetPath?: string | null): Promise<string | null>;
     resolveDroppedPath(candidatePath: string, kind: "student" | "group"): Promise<string | null>;
     getPathForFile(file: unknown): string | null;
+  };
+  reports: {
+    exportCsv(input: ReportCsvExportInput): Promise<string | null>;
   };
 }

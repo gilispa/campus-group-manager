@@ -11,7 +11,8 @@ export class StudentGroupRepository {
       studentId: data.studentId,
       groupId: data.groupId,
       roleId: data.roleId ?? null,
-      ...(data.joinedAt !== undefined ? { joinedAt: data.joinedAt } : {})
+      ...(data.joinedAt !== undefined ? { joinedAt: data.joinedAt } : {}),
+      ...(data.managementCycleId !== undefined ? { managementCycleId: data.managementCycleId } : {})
     };
 
     return this.prisma.studentGroup.create({
@@ -23,7 +24,7 @@ export class StudentGroupRepository {
             prepaProgram: true
           }
         },
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       }
     });
@@ -55,7 +56,7 @@ export class StudentGroupRepository {
             prepaProgram: true
           }
         },
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       }
     });
@@ -75,7 +76,7 @@ export class StudentGroupRepository {
             prepaProgram: true
           }
         },
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       }
     });
@@ -92,7 +93,7 @@ export class StudentGroupRepository {
             prepaProgram: true
           }
         },
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       }
     });
@@ -102,7 +103,7 @@ export class StudentGroupRepository {
     return this.prisma.studentGroup.findMany({
       where: { studentId },
       include: {
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       },
       orderBy: { joinedAt: "desc" }
@@ -113,7 +114,7 @@ export class StudentGroupRepository {
     return this.prisma.studentGroup.findMany({
       where: { studentId: { in: studentIds } },
       include: {
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       },
       orderBy: { joinedAt: "desc" }
@@ -140,7 +141,7 @@ export class StudentGroupRepository {
     return this.prisma.studentGroup.findMany({
       where: { studentId },
       include: {
-        group: { include: { category: true } },
+        group: { include: { giro: true, portfolio: true } },
         role: true
       },
       orderBy: { joinedAt: "desc" }

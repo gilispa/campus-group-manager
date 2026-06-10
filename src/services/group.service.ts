@@ -5,6 +5,7 @@ import { appPaths, uploadPrefixes } from "../config/paths";
 import { getPrismaClient } from "../database/prisma";
 import { CategoryRepository } from "../repositories/category.repository";
 import { GroupRepository } from "../repositories/group.repository";
+import { PortfolioRepository } from "../repositories/portfolio.repository";
 import type { GroupCreateInput, GroupSearchFilters, GroupUpdateInput } from "../types/domain";
 import { ConflictError, NotFoundError } from "../utils/errors";
 import { validateGroupCreate, validateGroupSearchFilters, validateGroupUpdate } from "../validation/group.validation";
@@ -13,11 +14,15 @@ export class GroupService {
   private readonly prisma = getPrismaClient();
   private readonly repository = new GroupRepository(this.prisma);
   private readonly categoryRepository = new CategoryRepository(this.prisma);
+  private readonly portfolioRepository = new PortfolioRepository(this.prisma);
 
   async createGroup(input: GroupCreateInput) {
     const data = validateGroupCreate(input);
-    if (data.categoryId) {
-      await this.ensureCategoryExists(data.categoryId);
+    if (data.giroId) {
+      await this.ensureGiroExists(data.giroId);
+    }
+    if (data.portfolioId) {
+      await this.ensurePortfolioExists(data.portfolioId);
     }
     await this.ensureGroupNameIsUnique(data.nombre);
     return this.repository.create(data);
@@ -27,8 +32,11 @@ export class GroupService {
     const current = await this.ensureGroupExists(id);
     const data = validateGroupUpdate(input);
 
-    if (data.categoryId) {
-      await this.ensureCategoryExists(data.categoryId);
+    if (data.giroId) {
+      await this.ensureGiroExists(data.giroId);
+    }
+    if (data.portfolioId) {
+      await this.ensurePortfolioExists(data.portfolioId);
     }
 
     if (data.nombre && data.nombre !== current.nombre) {
@@ -44,6 +52,12 @@ export class GroupService {
   }
 
   async restoreGroup(id: string) {
+    const deletedGroup = await this.repository.findDeletedById(id);
+    if (!deletedGroup) {
+      throw new NotFoundError("El grupo no esta en la papelera.");
+    }
+
+    await this.ensureGroupNameIsUnique(deletedGroup.nombre, id);
     return this.repository.restore(id);
   }
 
@@ -109,13 +123,22 @@ export class GroupService {
     await fs.rm(absolutePath, { force: true });
   }
 
-  private async ensureCategoryExists(id: string) {
-    const category = await this.categoryRepository.findById(id);
-    if (!category) {
-      throw new NotFoundError("Categoria no encontrada.");
+  private async ensureGiroExists(id: string) {
+    const giro = await this.categoryRepository.findById(id);
+    if (!giro) {
+      throw new NotFoundError("Giro no encontrado.");
     }
 
-    return category;
+    return giro;
+  }
+
+  private async ensurePortfolioExists(id: string) {
+    const portfolio = await this.portfolioRepository.findById(id);
+    if (!portfolio) {
+      throw new NotFoundError("Portafolio no encontrado.");
+    }
+
+    return portfolio;
   }
 
   private async ensureGroupExists(id: string) {
