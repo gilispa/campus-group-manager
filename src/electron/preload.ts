@@ -100,7 +100,7 @@ const desktopApi: DesktopApi = {
     listDeleted: () => invoke("students:listDeleted", undefined),
     search: (filters) => invoke("students:search", filters),
     exportCsv: (input) => invoke("students:exportCsv", input),
-    exportTemplateCsv: () => invoke("students:exportTemplateCsv", undefined),
+    exportTemplateXlsx: () => invoke("students:exportTemplateXlsx", undefined),
     importCsv: () => invoke("students:importCsv", undefined),
     pickPhoto: () => invoke("students:pickPhoto", undefined),
     savePhoto: (sourcePath, currentPhoto) =>
@@ -121,7 +121,7 @@ const desktopApi: DesktopApi = {
     listDeleted: () => invoke("groups:listDeleted", undefined),
     search: (filters) => invoke("groups:search", filters),
     exportCsv: (input) => invoke("groups:exportCsv", input),
-    exportTemplateCsv: () => invoke("groups:exportTemplateCsv", undefined),
+    exportTemplateXlsx: () => invoke("groups:exportTemplateXlsx", undefined),
     importCsv: () => invoke("groups:importCsv", undefined),
     pickLogo: () => invoke("groups:pickLogo", undefined),
     saveLogo: (sourcePath, currentLogo) =>
@@ -140,7 +140,7 @@ const desktopApi: DesktopApi = {
     historyByStudent: (studentId) => invoke("memberships:historyByStudent", { studentId }),
     historyByGroup: (groupId) => invoke("memberships:historyByGroup", { groupId }),
     exportCsv: (input) => invoke("memberships:exportCsv", input),
-    exportTemplateCsv: () => invoke("memberships:exportTemplateCsv", undefined),
+    exportTemplateXlsx: () => invoke("memberships:exportTemplateXlsx", undefined),
     importCsv: () => invoke("memberships:importCsv", undefined)
   },
   groupManagement: {

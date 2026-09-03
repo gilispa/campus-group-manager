@@ -115,7 +115,6 @@ type ReportOption = {
 const CATALOG_PAGE_SIZE = 8;
 const SEARCH_DEBOUNCE_MS = 350;
 
-const loginLogoUrl = new URL("../../images/ml-completo.png", import.meta.url).href;
 const sidebarLogoUrl = new URL("../../images/vincula.png", import.meta.url).href;
 
 const emptyStudentSearch = {
@@ -902,16 +901,16 @@ export function App() {
     }, "Rol actualizado.");
   }
 
-  async function exportMembershipTemplateCsv() {
+  async function exportMembershipTemplateXlsx() {
     await withAction(async () => {
-      const result = await desktopApi.memberships.exportTemplateCsv();
+      const result = await desktopApi.memberships.exportTemplateXlsx();
       if (result) {
         setNotice(`Plantilla de pertenencias creada en ${result}`);
       }
     }, undefined, "Creando plantilla de pertenencias...");
   }
 
-  async function importMembershipsCsv() {
+  async function importMembershipsFile() {
     await withAction(async () => {
       const result = await desktopApi.memberships.importCsv();
       await refreshData();
@@ -1135,16 +1134,16 @@ export function App() {
         : "Exportando pertenencias...");
   }
 
-  async function exportStudentsTemplateCsv() {
+  async function exportStudentsTemplateXlsx() {
     await withAction(async () => {
-      const result = await desktopApi.students.exportTemplateCsv();
+      const result = await desktopApi.students.exportTemplateXlsx();
       if (result) {
         setNotice(`Plantilla de estudiantes creada en ${result}`);
       }
     }, undefined, "Creando plantilla...");
   }
 
-  async function importStudentsCsv() {
+  async function importStudentsFile() {
     await withAction(async () => {
       const result = await desktopApi.students.importCsv();
       await refreshData();
@@ -1155,16 +1154,16 @@ export function App() {
     }, undefined, "Importando estudiantes...");
   }
 
-  async function exportGroupsTemplateCsv() {
+  async function exportGroupsTemplateXlsx() {
     await withAction(async () => {
-      const result = await desktopApi.groups.exportTemplateCsv();
+      const result = await desktopApi.groups.exportTemplateXlsx();
       if (result) {
         setNotice(`Plantilla de grupos creada en ${result}`);
       }
     }, undefined, "Creando plantilla...");
   }
 
-  async function importGroupsCsv() {
+  async function importGroupsFile() {
     await withAction(async () => {
       const result = await desktopApi.groups.importCsv();
       await refreshData();
@@ -1578,9 +1577,9 @@ export function App() {
   if (!initialized) {
     return (
       <AuthScreen
-        logoUrl={loginLogoUrl}
-        title="Acceso a ML Vincula"
-        description="Ingresa la contraseña para acceder"
+        logoUrl={sidebarLogoUrl}
+        title="Iniciar sesión"
+        description="Ingrese contraseña"
         password={setupPassword}
         setPassword={setSetupPassword}
         busy={busy}
@@ -1595,15 +1594,15 @@ export function App() {
   if (!authenticated) {
     return (
       <AuthScreen
-        logoUrl={loginLogoUrl}
-        title="Acceso a ML Vincula"
-        description="Ingresa la contraseña para acceder"
+        logoUrl={sidebarLogoUrl}
+        title="Iniciar sesión"
+        description="Ingrese contraseña"
         password={loginPassword}
         setPassword={setLoginPassword}
         busy={busy}
         error={error}
         notice={notice}
-        actionLabel="Entrar al sistema"
+        actionLabel="Login"
         onSubmit={() => void handleLogin()}
       />
     );
@@ -1909,24 +1908,24 @@ export function App() {
                 <h3>Estudiantes CSV</h3>
                 <p className="muted">Plantilla e importacion masiva de estudiantes.</p>
                 <div className="row-actions backup-domain-actions">
-                  <button className="ghost-button" onClick={() => void exportStudentsTemplateCsv()}>Descargar plantilla para importar estudiantes</button>
-                  <button className="danger-button" onClick={() => void importStudentsCsv()}>Importar estudiantes desde CSV</button>
+                  <button className="ghost-button" onClick={() => void exportStudentsTemplateXlsx()}>Descargar plantilla Excel para importar estudiantes</button>
+                  <button className="danger-button" onClick={() => void importStudentsFile()}>Importar estudiantes desde Excel o CSV</button>
                 </div>
               </div>
               <div className="card form-stack backup-domain-card">
                 <h3>Grupos CSV</h3>
                 <p className="muted">Plantilla e importacion masiva de grupos.</p>
                 <div className="row-actions backup-domain-actions">
-                  <button className="ghost-button" onClick={() => void exportGroupsTemplateCsv()}>Descargar plantilla para importar grupos</button>
-                  <button className="danger-button" onClick={() => void importGroupsCsv()}>Importar grupos desde CSV</button>
+                  <button className="ghost-button" onClick={() => void exportGroupsTemplateXlsx()}>Descargar plantilla Excel para importar grupos</button>
+                  <button className="danger-button" onClick={() => void importGroupsFile()}>Importar grupos desde Excel o CSV</button>
                 </div>
               </div>
               <div className="card form-stack backup-domain-card">
                 <h3>Pertenencias CSV</h3>
                 <p className="muted">Plantilla e importacion masiva de pertenencias.</p>
                 <div className="row-actions backup-domain-actions">
-                  <button className="ghost-button" onClick={() => void exportMembershipTemplateCsv()}>Descargar plantilla para importar pertenencias</button>
-                  <button className="danger-button" onClick={() => void importMembershipsCsv()}>Importar pertenencias desde CSV</button>
+                  <button className="ghost-button" onClick={() => void exportMembershipTemplateXlsx()}>Descargar plantilla Excel para importar pertenencias</button>
+                  <button className="danger-button" onClick={() => void importMembershipsFile()}>Importar pertenencias desde Excel o CSV</button>
                 </div>
               </div>
             </div>
@@ -2658,26 +2657,30 @@ function AuthScreen(props: {
 }) {
   return (
     <div className="auth-shell">
-      <div className="auth-card auth-brand-card">
-        <div className="auth-logo-row">
-          <img src={props.logoUrl} alt="ML Vincula" className="auth-logo" />
+      <div className="auth-panel">
+        <img src={props.logoUrl} alt="Vincula" className="auth-login-logo" />
+        <div className="auth-card auth-brand-card">
+          <div className="auth-heading">
+            <h1>{props.title}</h1>
+            <p>{props.description}</p>
+          </div>
+          <label className="auth-field-label" htmlFor="auth-password">Contraseña</label>
+          <input
+            id="auth-password"
+            type="password"
+            value={props.password}
+            onChange={(event) => props.setPassword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                props.onSubmit();
+              }
+            }}
+            placeholder="Contraseña"
+          />
+          <button className="auth-submit-button" onClick={props.onSubmit} disabled={props.busy}>{props.actionLabel}</button>
+          {props.notice ? <p className="success-text">{props.notice}</p> : null}
+          {props.error ? <p className="error-text">{props.error}</p> : null}
         </div>
-        <h1>{props.title}</h1>
-        <p className="muted">{props.description}</p>
-        <input
-          type="password"
-          value={props.password}
-          onChange={(event) => props.setPassword(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              props.onSubmit();
-            }
-          }}
-          placeholder="Contraseña"
-        />
-        <button onClick={props.onSubmit} disabled={props.busy}>{props.actionLabel}</button>
-        {props.notice ? <p className="success-text">{props.notice}</p> : null}
-        {props.error ? <p className="error-text">{props.error}</p> : null}
       </div>
     </div>
   );
@@ -3109,7 +3112,12 @@ function StatCard({
         ) : null}
       </div>
       <strong className="stat-card-value">{value}</strong>
-      {hint ? <span className="stat-card-hint">{hint}</span> : null}
+      {hint ? (
+        <span className="stat-card-hint">
+          <span>{hint}</span>
+          {onClick ? <DashboardIcon name="openList" /> : null}
+        </span>
+      ) : null}
     </>
   );
 
@@ -3131,7 +3139,7 @@ type DashboardSegmentMetrics = {
   studentsWithoutGroup: number;
 };
 
-type DashboardIconName = "refresh" | "students" | "groups" | "membership" | "pending";
+type DashboardIconName = "refresh" | "students" | "groups" | "membership" | "pending" | "openList";
 
 function DashboardIcon(props: { name: DashboardIconName }) {
   switch (props.name) {
@@ -3177,6 +3185,13 @@ function DashboardIcon(props: { name: DashboardIconName }) {
           <path d="M12 7v5l3 2" />
         </svg>
       );
+    case "openList":
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M7 17 17 7" />
+          <path d="M8 7h9v9" />
+        </svg>
+      );
   }
 }
 
@@ -3189,9 +3204,9 @@ function DashboardSegmentCard(props: {
   const segment = props.segment ?? { students: 0, groups: 0, studentsInGroups: 0, studentsWithoutGroup: 0 };
   const isGeneral = typeof props.pendingCount === "number";
   const stats = [
-    { label: "Estudiantes", value: segment.students, icon: "students" as DashboardIconName },
-    ...(isGeneral ? [{ label: "Grupos", value: segment.groups, icon: "groups" as DashboardIconName }] : []),
-    { label: "Dentro de un grupo", value: segment.studentsInGroups, icon: "membership" as DashboardIconName }
+    { label: "Estudiantes registrados", value: segment.students, icon: "students" as DashboardIconName },
+    ...(isGeneral ? [{ label: "Grupos registrados", value: segment.groups, icon: "groups" as DashboardIconName }] : []),
+    { label: "Estudiantes con grupo", value: segment.studentsInGroups, icon: "membership" as DashboardIconName }
   ];
 
   return (
@@ -3208,10 +3223,10 @@ function DashboardSegmentCard(props: {
               <StatCard key={`${props.title}-${stat.label}`} label={stat.label} value={stat.value} icon={stat.icon} />
             ))}
             <StatCard
-              label="Pendientes por agregar"
+              label="Estudiantes pendientes por agregar"
               value={props.pendingCount ?? 0}
               icon="pending"
-              hint="Abrir lista"
+              hint="Ver lista"
               onClick={props.onPendingClick}
               accent="warm"
             />
@@ -3239,14 +3254,14 @@ function MembershipPieChart(props: { variant: "general" | "minimal"; inGroup: nu
   const percentage = total > 0 ? Math.round((props.inGroup / total) * 100) : 0;
   const withoutGroupPercentage = total > 0 ? 100 - percentage : 0;
   const background = total > 0
-    ? `conic-gradient(#1f7a5f 0 ${percentage}%, #f6f8fb ${percentage}% ${Math.min(percentage + 1, 100)}%, #d9534f ${Math.min(percentage + 1, 100)}% 100%)`
-    : "conic-gradient(#d7dde5 0 100%)";
+    ? `conic-gradient(var(--chart-blue-strong) 0 ${percentage}%, #f6f8fb ${percentage}% ${Math.min(percentage + 1, 100)}%, var(--chart-blue-soft) ${Math.min(percentage + 1, 100)}% 100%)`
+    : "conic-gradient(var(--chart-empty) 0 100%)";
   const isMinimal = props.variant === "minimal";
 
   return (
     <div className={`dashboard-pie-row${isMinimal ? " dashboard-pie-row-minimal" : ""}`}>
       <div className="dashboard-pie-shell">
-        <div className="dashboard-pie" style={{ background }} aria-label={`${props.inGroup} dentro de un grupo, ${props.withoutGroup} sin grupo`}>
+        <div className="dashboard-pie" style={{ background }} aria-label={`${props.inGroup} estudiantes con grupo, ${props.withoutGroup} estudiantes sin grupo`}>
           <div className="dashboard-pie-center">
             <strong>{percentage}%</strong>
             <span>con grupo</span>
@@ -3256,14 +3271,14 @@ function MembershipPieChart(props: { variant: "general" | "minimal"; inGroup: nu
       <div className="dashboard-pie-copy">
         <div className="dashboard-pie-legend">
           <div className="dashboard-pie-legend-row">
-            <span className="dashboard-pie-legend-label"><i className="legend-dot in-group" />Dentro</span>
+            <span className="dashboard-pie-legend-label"><i className="legend-dot in-group" />Estudiantes con grupo</span>
             <div className="dashboard-pie-legend-values">
               <strong>{props.inGroup}</strong>
               <span>{percentage}%</span>
             </div>
           </div>
           <div className="dashboard-pie-legend-row">
-            <span className="dashboard-pie-legend-label"><i className="legend-dot without-group" />Sin grupo</span>
+            <span className="dashboard-pie-legend-label"><i className="legend-dot without-group" />Estudiantes sin grupo</span>
             <div className="dashboard-pie-legend-values">
               <strong>{props.withoutGroup}</strong>
               <span>{withoutGroupPercentage}%</span>

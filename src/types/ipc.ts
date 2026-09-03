@@ -119,7 +119,7 @@ export interface IpcChannelMap {
   "students:listDeleted": { input: void; output: unknown[] };
   "students:search": { input: StudentSearchFilters; output: unknown[] };
   "students:exportCsv": { input: StudentCsvExportInput; output: string | null };
-  "students:exportTemplateCsv": { input: void; output: string | null };
+  "students:exportTemplateXlsx": { input: void; output: string | null };
   "students:importCsv": { input: void; output: BulkImportResult };
   "students:pickPhoto": { input: void; output: string | null };
   "students:savePhoto": { input: { sourcePath: string; currentPhoto?: string | null }; output: string };
@@ -135,7 +135,7 @@ export interface IpcChannelMap {
   "groups:listDeleted": { input: void; output: unknown[] };
   "groups:search": { input: GroupSearchFilters; output: unknown[] };
   "groups:exportCsv": { input: GroupCsvExportInput; output: string | null };
-  "groups:exportTemplateCsv": { input: void; output: string | null };
+  "groups:exportTemplateXlsx": { input: void; output: string | null };
   "groups:importCsv": { input: void; output: BulkImportResult };
   "groups:pickLogo": { input: void; output: string | null };
   "groups:saveLogo": { input: { sourcePath: string; currentLogo?: string | null }; output: string };
@@ -149,7 +149,7 @@ export interface IpcChannelMap {
   "memberships:historyByStudent": { input: { studentId: string }; output: unknown[] };
   "memberships:historyByGroup": { input: { groupId: string }; output: unknown[] };
   "memberships:exportCsv": { input: MembershipCsvExportInput; output: string | null };
-  "memberships:exportTemplateCsv": { input: void; output: string | null };
+  "memberships:exportTemplateXlsx": { input: void; output: string | null };
   "memberships:importCsv": { input: void; output: BulkImportResult };
 
   "groupManagement:exportTemplateXlsx": { input: GroupManagementTemplateInput; output: string | null };
@@ -253,7 +253,7 @@ export interface DesktopApi {
     listDeleted(): Promise<unknown[]>;
     search(filters: StudentSearchFilters): Promise<unknown[]>;
     exportCsv(input: StudentCsvExportInput): Promise<string | null>;
-    exportTemplateCsv(): Promise<string | null>;
+    exportTemplateXlsx(): Promise<string | null>;
     importCsv(): Promise<BulkImportResult>;
     pickPhoto(): Promise<string | null>;
     savePhoto(sourcePath: string, currentPhoto?: string | null): Promise<string>;
@@ -270,7 +270,7 @@ export interface DesktopApi {
     listDeleted(): Promise<unknown[]>;
     search(filters: GroupSearchFilters): Promise<unknown[]>;
     exportCsv(input: GroupCsvExportInput): Promise<string | null>;
-    exportTemplateCsv(): Promise<string | null>;
+    exportTemplateXlsx(): Promise<string | null>;
     importCsv(): Promise<BulkImportResult>;
     pickLogo(): Promise<string | null>;
     saveLogo(sourcePath: string, currentLogo?: string | null): Promise<string>;
@@ -285,7 +285,7 @@ export interface DesktopApi {
     historyByStudent(studentId: string): Promise<unknown[]>;
     historyByGroup(groupId: string): Promise<unknown[]>;
     exportCsv(input: MembershipCsvExportInput): Promise<string | null>;
-    exportTemplateCsv(): Promise<string | null>;
+    exportTemplateXlsx(): Promise<string | null>;
     importCsv(): Promise<BulkImportResult>;
   };
   groupManagement: {

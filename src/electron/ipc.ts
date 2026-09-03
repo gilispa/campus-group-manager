@@ -12,6 +12,7 @@ import type {
   StudentExportColumn
 } from "../types/domain";
 import { AuthenticationError } from "../utils/errors";
+import { readImportWorkbook, writeImportTemplate } from "../services/import-template.service";
 
 type Handler<K extends IpcChannel> = (input: IpcChannelMap[K]["input"], event: IpcMainInvokeEvent) => Promise<IpcChannelMap[K]["output"]>;
 
@@ -222,14 +223,29 @@ export function registerIpcHandlers(): void {
         })
       ]);
     },
-    "students:exportTemplateCsv": async () => exportCsv("plantilla-estudiantes.csv", [studentImportHeaders]),
+    "students:exportTemplateXlsx": async () => {
+      const result = await dialog.showSaveDialog({ defaultPath: "plantilla-estudiantes.xlsx", filters: [{ name: "Excel", extensions: ["xlsx"] }] });
+      if (result.canceled || !result.filePath) return null;
+      const [careers, programs] = await Promise.all([services.careerService.listCareers(), services.prepaProgramService.listPrepaPrograms()]);
+      return writeImportTemplate(result.filePath, studentImportHeaders, [
+        { field: "Nombre", instruction: "Obligatorio. Nombre completo del estudiante." },
+        { field: "Matricula", instruction: "Obligatoria. Debe ser unica." },
+        { field: "Nivel", instruction: "Copia una opcion exacta: PREPA o PROFESIONAL." },
+        { field: "Carrera", instruction: `Obligatoria para PROFESIONAL. Opciones actuales: ${careers.map((item) => item.name).join(", ") || "Sin carreras registradas"}` },
+        { field: "Programa prepa", instruction: `Obligatorio para PREPA. Opciones actuales: ${programs.map((item) => item.name).join(", ") || "Sin programas registrados"}` },
+        { field: "Generacion", instruction: "Obligatoria. Numero entero positivo, por ejemplo 2026." },
+        { field: "Email / Telefono / Notas", instruction: "Opcionales. Deja vacio si no aplica." },
+        { field: "Activo", instruction: "Opcional. Copia Si o No; si se deja vacio se toma como Si." },
+        { field: "Ejemplo", instruction: `Nombre: Ana Lopez | Matricula: A01234567 | Nivel: PROFESIONAL | Carrera: ${careers[0]?.name ?? "Carrera"} | Generacion: 2026 | Activo: Si` }
+      ]);
+    },
     "students:importCsv": async () => {
       const filePath = await pickCsvImportFile();
       if (!filePath) {
         return { created: 0, failed: 0, errors: [] };
       }
 
-      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      const rows = await readImportRows(filePath, studentImportHeaders);
       const careers = await services.careerService.listCareers();
       const programs = await services.prepaProgramService.listPrepaPrograms();
       const careerByName = createNameLookup(careers);
@@ -237,7 +253,7 @@ export function registerIpcHandlers(): void {
       const result = { created: 0, failed: 0, errors: [] as string[] };
 
       for (const [index, row] of rows.entries()) {
-        const lineNumber = index + 2;
+        const lineNumber = getImportRowNumber(row, index + 2);
         try {
           const nivel = normalizeLevel(getCsvValue(row, "Nivel"));
           const careerName = getCsvValue(row, "Carrera");
@@ -323,14 +339,25 @@ export function registerIpcHandlers(): void {
         }))
       ]);
     },
-    "groups:exportTemplateCsv": async () => exportCsv("plantilla-grupos.csv", [groupImportHeaders]),
+    "groups:exportTemplateXlsx": async () => {
+      const result = await dialog.showSaveDialog({ defaultPath: "plantilla-grupos.xlsx", filters: [{ name: "Excel", extensions: ["xlsx"] }] });
+      if (result.canceled || !result.filePath) return null;
+      const [giros, portfolios] = await Promise.all([services.giroService.listCategories(), services.portfolioService.listPortfolios()]);
+      return writeImportTemplate(result.filePath, groupImportHeaders, [
+        { field: "Nombre", instruction: "Obligatorio. Nombre del grupo." },
+        { field: "Giro", instruction: `Obligatorio. Copia una opcion exacta: ${giros.map((item) => item.name).join(", ") || "Sin giros registrados"}` },
+        { field: "Portafolio", instruction: `Obligatorio. Copia una opcion exacta: ${portfolios.map((item) => item.name).join(", ") || "Sin portafolios registrados"}` },
+        { field: "Descripcion", instruction: "Opcional. Descripcion del grupo." },
+        { field: "Ejemplo", instruction: `Nombre: Grupo ejemplo | Giro: ${giros[0]?.name ?? "Giro"} | Portafolio: ${portfolios[0]?.name ?? "Portafolio"}` }
+      ]);
+    },
     "groups:importCsv": async () => {
       const filePath = await pickCsvImportFile();
       if (!filePath) {
         return { created: 0, failed: 0, errors: [] };
       }
 
-      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      const rows = await readImportRows(filePath, groupImportHeaders);
       const giros = await services.giroService.listCategories();
       const portfolios = await services.portfolioService.listPortfolios();
       const giroByName = createNameLookup(giros);
@@ -338,9 +365,9 @@ export function registerIpcHandlers(): void {
       const result = { created: 0, failed: 0, errors: [] as string[] };
 
       for (const [index, row] of rows.entries()) {
-        const lineNumber = index + 2;
+        const lineNumber = getImportRowNumber(row, index + 2);
         try {
-          const giroName = getCsvValue(row, "Giro");
+          const giroName = getCsvValue(row, "Giro") || getCsvValue(row, "Categoria");
           const portfolioName = getCsvValue(row, "Portafolio");
           const giro = giroByName.get(normalizeLookupKey(giroName));
           const portfolio = portfolioByName.get(normalizeLookupKey(portfolioName));
@@ -400,14 +427,26 @@ export function registerIpcHandlers(): void {
         ])
       ]);
     },
-    "memberships:exportTemplateCsv": async () => exportCsv("plantilla-pertenencias.csv", [membershipImportHeaders]),
+    "memberships:exportTemplateXlsx": async () => {
+      const result = await dialog.showSaveDialog({ defaultPath: "plantilla-pertenencias.xlsx", filters: [{ name: "Excel", extensions: ["xlsx"] }] });
+      if (result.canceled || !result.filePath) return null;
+      const [groups, roles] = await Promise.all([services.groupService.listGroups(), services.roleService.listRoles()]);
+      return writeImportTemplate(result.filePath, membershipImportHeaders, [
+        { field: "Matricula", instruction: "Obligatoria. Debe coincidir con un estudiante existente." },
+        { field: "Grupo", instruction: `Obligatorio. Copia una opcion exacta: ${groups.map((item) => item.nombre).join(", ") || "Sin grupos registrados"}` },
+        { field: "Rol", instruction: `Opcional. Copia una opcion exacta: ${roles.map((item) => item.name).join(", ") || "Sin roles registrados"}` },
+        { field: "FechaIngreso / FechaSalida", instruction: "Opcionales. Usa una fecha reconocible, preferentemente AAAA-MM-DD." },
+        { field: "Activo", instruction: "Opcional. Copia Si o No; si se deja vacio se toma como vigente." },
+        { field: "Ejemplo", instruction: `Matricula: A01234567 | Grupo: ${groups[0]?.nombre ?? "Grupo"} | Rol: ${roles[0]?.name ?? "Rol"} | Activo: Si` }
+      ]);
+    },
     "memberships:importCsv": async () => {
       const filePath = await pickCsvImportFile();
       if (!filePath) {
         return { created: 0, failed: 0, errors: [] };
       }
 
-      const rows = parseCsv(await fs.readFile(filePath, "utf8"));
+      const rows = await readImportRows(filePath, membershipImportHeaders);
       return services.studentGroupService.importMemberships(
         rows.map((row) => {
           return {
@@ -416,7 +455,8 @@ export function registerIpcHandlers(): void {
             roleName: optionalCsvValue(row, "Rol"),
             joinedAt: optionalCsvValue(row, "FechaIngreso"),
             leftAt: optionalCsvValue(row, "FechaSalida"),
-            active: parseOptionalBoolean(getCsvValue(row, "Activo"))
+            active: parseOptionalBoolean(getCsvValue(row, "Activo")),
+            sourceRow: getImportRowNumber(row, 0)
           };
         })
       );
@@ -537,10 +577,16 @@ function selectExportColumns<T extends string>(
 async function pickCsvImportFile(): Promise<string | null> {
   const result = await dialog.showOpenDialog({
     properties: ["openFile"],
-    filters: [{ name: "CSV", extensions: ["csv"] }]
+    filters: [{ name: "Excel o CSV", extensions: ["xlsx", "csv"] }]
   });
 
   return result.canceled ? null : (result.filePaths[0] ?? null);
+}
+
+async function readImportRows(filePath: string, expectedHeaders: string[]): Promise<Array<Record<string, string>>> {
+  return filePath.toLowerCase().endsWith(".xlsx")
+    ? readImportWorkbook(filePath, expectedHeaders)
+    : parseCsv(await fs.readFile(filePath, "utf8"));
 }
 
 async function pickXlsxImportFile(): Promise<string | null> {
@@ -605,6 +651,11 @@ function parseCsv(content: string): Array<Record<string, string>> {
 
 function getCsvValue(row: Record<string, string>, header: string): string {
   return row[normalizeHeader(header)] ?? "";
+}
+
+function getImportRowNumber(row: Record<string, string>, fallback: number): number {
+  const sourceRow = Number(row.__sourceRow);
+  return Number.isInteger(sourceRow) && sourceRow > 0 ? sourceRow : fallback;
 }
 
 function optionalCsvValue(row: Record<string, string>, header: string): string | null {

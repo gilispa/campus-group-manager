@@ -197,17 +197,12 @@ export class BackupService {
 
     try {
       await prisma.$connect();
-      await Promise.all([
-        prisma.student.count(),
-        prisma.group.count(),
-        prisma.giro.count(),
-        prisma.portfolio.count(),
-        prisma.role.count(),
-        prisma.studentGroup.count(),
-        prisma.groupManagementCycle.count(),
-        prisma.pendingMembership.count(),
-        prisma.adminSettings.count()
-      ]);
+      try {
+        await this.validateDatabaseShape(prisma);
+      } catch {
+        await this.upgradeLegacyImportedDatabase(prisma);
+        await this.validateDatabaseShape(prisma);
+      }
     } catch {
       throw new ValidationError("La base importada no coincide con el schema esperado por la aplicacion.");
     } finally {
@@ -217,6 +212,10 @@ export class BackupService {
 
   private async validateCurrentDatabase(): Promise<void> {
     const prisma = getPrismaClient();
+    await this.validateDatabaseShape(prisma);
+  }
+
+  private async validateDatabaseShape(prisma: ReturnType<typeof getPrismaClient>): Promise<void> {
     await Promise.all([
       prisma.student.count(),
       prisma.group.count(),
@@ -228,6 +227,156 @@ export class BackupService {
       prisma.pendingMembership.count(),
       prisma.adminSettings.count()
     ]);
+  }
+
+  private async upgradeLegacyImportedDatabase(prisma: ReturnType<typeof getPrismaClient>): Promise<void> {
+    await prisma.$executeRawUnsafe("PRAGMA foreign_keys=OFF");
+
+    await this.addColumnIfMissing(prisma, "Student", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "Group", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "Category", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "Giro", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "Role", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "Career", "deletedAt", "DATETIME");
+    await this.addColumnIfMissing(prisma, "PrepaProgram", "deletedAt", "DATETIME");
+
+    if (await this.tableExists(prisma, "Category")) {
+      if (!(await this.tableExists(prisma, "Giro"))) {
+        await prisma.$executeRawUnsafe('ALTER TABLE "Category" RENAME TO "Giro"');
+      }
+    }
+
+    if (!(await this.tableExists(prisma, "Portfolio"))) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE "Portfolio" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "name" TEXT NOT NULL,
+          "description" TEXT,
+          "deletedAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    await prisma.$executeRawUnsafe(`
+      INSERT OR IGNORE INTO "Giro" ("id", "name", "description", "createdAt")
+      VALUES ('sin-giro', 'Sin giro', 'Giro temporal para grupos heredados sin categoria.', CURRENT_TIMESTAMP)
+    `);
+    await prisma.$executeRawUnsafe(`
+      INSERT OR IGNORE INTO "Portfolio" ("id", "name", "description", "createdAt")
+      VALUES ('sin-portafolio', 'Sin portafolio', 'Portafolio temporal para grupos existentes.', CURRENT_TIMESTAMP)
+    `);
+
+    await this.addColumnIfMissing(prisma, "Student", "academicPending", "BOOLEAN NOT NULL DEFAULT false");
+    await this.addColumnIfMissing(prisma, "Group", "giroId", "TEXT");
+    await this.addColumnIfMissing(prisma, "Group", "portfolioId", "TEXT");
+    await this.addColumnIfMissing(prisma, "StudentGroup", "managementCycleId", "TEXT");
+
+    if (await this.columnExists(prisma, "Group", "categoryId")) {
+      await prisma.$executeRawUnsafe('UPDATE "Group" SET "giroId" = COALESCE("giroId", "categoryId", \'sin-giro\')');
+    } else {
+      await prisma.$executeRawUnsafe('UPDATE "Group" SET "giroId" = COALESCE("giroId", \'sin-giro\')');
+    }
+    await prisma.$executeRawUnsafe('UPDATE "Group" SET "portfolioId" = COALESCE("portfolioId", \'sin-portafolio\')');
+
+    if (!(await this.tableExists(prisma, "GroupManagementCycle"))) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE "GroupManagementCycle" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "groupId" TEXT NOT NULL,
+          "label" TEXT,
+          "effectiveAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    }
+
+    if (!(await this.tableExists(prisma, "PendingMembership"))) {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE "PendingMembership" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "matricula" TEXT NOT NULL,
+          "nombre" TEXT,
+          "groupId" TEXT NOT NULL,
+          "roleId" TEXT,
+          "roleName" TEXT,
+          "joinedAt" DATETIME,
+          "managementCycleId" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'PENDING',
+          "resolvedAt" DATETIME,
+          "resolvedStudentId" TEXT,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL
+        )
+      `);
+    }
+
+    await this.createIndexIfMissing(prisma, "Giro_name_key", "Giro", '"name"', true);
+    await this.createIndexIfMissing(prisma, "Portfolio_name_key", "Portfolio", '"name"', true);
+    await this.createIndexIfMissing(prisma, "Student_deletedAt_idx", "Student", '"deletedAt"');
+    await this.createIndexIfMissing(prisma, "Group_deletedAt_idx", "Group", '"deletedAt"');
+    await this.createIndexIfMissing(prisma, "Group_giroId_idx", "Group", '"giroId"');
+    await this.createIndexIfMissing(prisma, "Group_portfolioId_idx", "Group", '"portfolioId"');
+    await this.createIndexIfMissing(prisma, "StudentGroup_managementCycleId_idx", "StudentGroup", '"managementCycleId"');
+    await this.createIndexIfMissing(prisma, "GroupManagementCycle_groupId_idx", "GroupManagementCycle", '"groupId"');
+    await this.createIndexIfMissing(prisma, "GroupManagementCycle_effectiveAt_idx", "GroupManagementCycle", '"effectiveAt"');
+    await this.createIndexIfMissing(prisma, "PendingMembership_matricula_idx", "PendingMembership", '"matricula"');
+    await this.createIndexIfMissing(prisma, "PendingMembership_groupId_idx", "PendingMembership", '"groupId"');
+    await this.createIndexIfMissing(prisma, "PendingMembership_status_idx", "PendingMembership", '"status"');
+    await this.createIndexIfMissing(prisma, "PendingMembership_resolvedStudentId_idx", "PendingMembership", '"resolvedStudentId"');
+
+    await prisma.$executeRawUnsafe("PRAGMA foreign_keys=ON");
+  }
+
+  private async tableExists(prisma: ReturnType<typeof getPrismaClient>, tableName: string): Promise<boolean> {
+    const rows = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+      'SELECT "name" FROM "sqlite_master" WHERE "type" = ? AND "name" = ? LIMIT 1',
+      "table",
+      tableName
+    );
+    return rows.length > 0;
+  }
+
+  private async columnExists(prisma: ReturnType<typeof getPrismaClient>, tableName: string, columnName: string): Promise<boolean> {
+    if (!(await this.tableExists(prisma, tableName))) {
+      return false;
+    }
+
+    const columns = await prisma.$queryRawUnsafe<Array<{ name: string }>>(`PRAGMA table_info("${this.escapeIdentifier(tableName)}")`);
+    return columns.some((column) => column.name === columnName);
+  }
+
+  private async addColumnIfMissing(
+    prisma: ReturnType<typeof getPrismaClient>,
+    tableName: string,
+    columnName: string,
+    definition: string
+  ): Promise<void> {
+    if (!(await this.tableExists(prisma, tableName)) || await this.columnExists(prisma, tableName, columnName)) {
+      return;
+    }
+
+    await prisma.$executeRawUnsafe(`ALTER TABLE "${this.escapeIdentifier(tableName)}" ADD COLUMN "${this.escapeIdentifier(columnName)}" ${definition}`);
+  }
+
+  private async createIndexIfMissing(
+    prisma: ReturnType<typeof getPrismaClient>,
+    indexName: string,
+    tableName: string,
+    columns: string,
+    unique = false
+  ): Promise<void> {
+    if (!(await this.tableExists(prisma, tableName))) {
+      return;
+    }
+
+    await prisma.$executeRawUnsafe(
+      `CREATE ${unique ? "UNIQUE " : ""}INDEX IF NOT EXISTS "${this.escapeIdentifier(indexName)}" ON "${this.escapeIdentifier(tableName)}"(${columns})`
+    );
+  }
+
+  private escapeIdentifier(value: string): string {
+    return value.replace(/"/g, '""');
   }
 
   private async normalizeImportedAssetReferences(filePath: string, uploadsRoot: string): Promise<void> {
@@ -274,7 +423,7 @@ export class BackupService {
   }
 
   private buildPrismaSqliteUrl(filePath: string): string {
-    const relativePath = path.relative(appPaths.prismaDir, filePath).replace(/\\/g, "/");
-    return `file:${relativePath}`;
+    const normalizedPath = path.resolve(filePath).replace(/\\/g, "/");
+    return `file:${normalizedPath}`;
   }
 }

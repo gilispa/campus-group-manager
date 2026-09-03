@@ -1,6 +1,6 @@
 {
   "name": "base-de-datos-grupos",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "Backend local-first para gestion de grupos estudiantiles con Electron, Prisma y SQLite",
   "main": "dist/electron/main.js",
@@ -14,7 +14,7 @@
     "dev:renderer": "vite",
     "dev:electron": "node scripts/start-electron-dev.mjs",
     "start:desktop": "npm run build && npx electron .",
-    "dist:win": "npm run build && electron-builder --win nsis portable",
+    "dist:win": "npm run build && electron-builder --win nsis",
     "dist:dir": "npm run build && electron-builder --dir",
     "examples": "tsx src/main/examples.ts",
     "test": "tsx --test tests/**/*.test.ts",
@@ -29,6 +29,7 @@
     "adm-zip": "^0.5.17",
     "bcrypt": "^5.1.1",
     "exceljs": "^4.4.0",
+    "prisma": "^6.8.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -41,7 +42,6 @@
     "concurrently": "^9.1.2",
     "electron": "^35.5.1",
     "electron-builder": "^24.13.3",
-    "prisma": "^6.8.2",
     "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
@@ -51,16 +51,121 @@
     "appId": "mx.university.grupos.desktop",
     "productName": "Gestion Grupos Estudiantiles",
     "asar": true,
+    "npmRebuild": false,
+    "asarUnpack": [
+      "node_modules/prisma/**/*",
+      "node_modules/@prisma/**/*",
+      "node_modules/.prisma/**/*"
+    ],
     "directories": {
       "output": "release"
     },
     "files": [
       "dist/**/*",
       "images/**/*",
+      "node_modules/prisma/**/*",
       "node_modules/@prisma/**/*",
       "node_modules/.prisma/**/*",
       "prisma/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/.prisma",
+        "to": "node_modules/.prisma"
+      },
+      {
+        "from": "node_modules/@prisma/client",
+        "to": "node_modules/@prisma/client"
+      },
+      {
+        "from": "node_modules/c12",
+        "to": "node_modules/c12"
+      },
+      {
+        "from": "node_modules/chokidar",
+        "to": "node_modules/chokidar"
+      },
+      {
+        "from": "node_modules/confbox",
+        "to": "node_modules/confbox"
+      },
+      {
+        "from": "node_modules/deepmerge-ts",
+        "to": "node_modules/deepmerge-ts"
+      },
+      {
+        "from": "node_modules/defu",
+        "to": "node_modules/defu"
+      },
+      {
+        "from": "node_modules/destr",
+        "to": "node_modules/destr"
+      },
+      {
+        "from": "node_modules/dotenv",
+        "to": "node_modules/dotenv"
+      },
+      {
+        "from": "node_modules/effect",
+        "to": "node_modules/effect"
+      },
+      {
+        "from": "node_modules/empathic",
+        "to": "node_modules/empathic"
+      },
+      {
+        "from": "node_modules/exsolve",
+        "to": "node_modules/exsolve"
+      },
+      {
+        "from": "node_modules/fast-check",
+        "to": "node_modules/fast-check"
+      },
+      {
+        "from": "node_modules/giget",
+        "to": "node_modules/giget"
+      },
+      {
+        "from": "node_modules/jiti",
+        "to": "node_modules/jiti"
+      },
+      {
+        "from": "node_modules/nypm",
+        "to": "node_modules/nypm"
+      },
+      {
+        "from": "node_modules/ohash",
+        "to": "node_modules/ohash"
+      },
+      {
+        "from": "node_modules/pathe",
+        "to": "node_modules/pathe"
+      },
+      {
+        "from": "node_modules/perfect-debounce",
+        "to": "node_modules/perfect-debounce"
+      },
+      {
+        "from": "node_modules/pkg-types",
+        "to": "node_modules/pkg-types"
+      },
+      {
+        "from": "node_modules/pure-rand",
+        "to": "node_modules/pure-rand"
+      },
+      {
+        "from": "node_modules/rc9",
+        "to": "node_modules/rc9"
+      },
+      {
+        "from": "node_modules/readdirp",
+        "to": "node_modules/readdirp"
+      },
+      {
+        "from": "node_modules/@standard-schema/spec",
+        "to": "node_modules/@standard-schema/spec"
+      }
     ],
     "extraMetadata": {
       "main": "dist/electron/main.js"
@@ -68,8 +173,7 @@
     "win": {
       "icon": "images/ml-v.png",
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },

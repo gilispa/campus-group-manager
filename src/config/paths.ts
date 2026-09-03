@@ -1,6 +1,6 @@
 import path from "node:path";
 
-const projectRoot = process.cwd();
+const projectRoot = process.env.APP_PROJECT_ROOT?.trim() || process.cwd();
 const appDataRoot = process.env.APP_DATA_DIR?.trim() || path.join(projectRoot, "data");
 
 export const appPaths = {

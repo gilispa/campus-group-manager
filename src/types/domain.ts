@@ -155,6 +155,7 @@ export interface ParticipationCsvImportRow {
   joinedAt?: Date | string | null;
   leftAt?: Date | string | null;
   active?: boolean | null;
+  sourceRow?: number;
 }
 
 export interface GroupManagementTemplateInput {

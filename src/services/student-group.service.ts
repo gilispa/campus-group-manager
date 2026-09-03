@@ -136,7 +136,7 @@ export class StudentGroupService {
     const roleByName = new Map(roles.map((role) => [normalizeLookupKey(role.name), role]));
 
     for (const [index, row] of rows.entries()) {
-      const lineNumber = index + 2;
+      const lineNumber = row.sourceRow && row.sourceRow > 0 ? row.sourceRow : index + 2;
       try {
         const student = studentByMatricula.get(normalizeLookupKey(row.matricula));
         if (!student) {
