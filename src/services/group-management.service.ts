@@ -7,6 +7,7 @@ import type {
   GroupManagementPreviewRow
 } from "../types/domain";
 import { NotFoundError } from "../utils/errors";
+import { formatQuotedOptions } from "./import-template.service";
 
 type ParsedManagementRow = {
   lineNumber: number;
@@ -49,14 +50,14 @@ export class GroupManagementService {
       { field: "Grupo", instruction: group.nombre },
       { field: "Matricula", instruction: "Obligatoria. Debe coincidir con la matricula del alumno en la base." },
       { field: "Nombre", instruction: "Opcional. Se usa para identificar alumnos pendientes si no existen en la base." },
-      { field: "Rol", instruction: "Opcional. Usa exactamente uno de los roles listados abajo para evitar errores." },
+      { field: "Rol", instruction: "Opcional. Copia exactamente uno de los roles entre comillas listados abajo para evitar errores." },
       { field: "Fecha de ingreso", instruction: "No se captura en la plantilla. Se asigna automaticamente con la fecha en que se aplica el cambio de gestion." },
       { field: "Alumnos faltantes", instruction: "Si la matricula no existe, se guardara como pendiente y se vinculara al crear el alumno." }
     ]);
 
     instructions.addRow({});
     instructions.addRow({ field: "Ejemplo", instruction: `Matricula: A01234567 | Nombre: Nombre Apellido | Rol: ${roles[0]?.name ?? "Nombre exacto del rol"}` });
-    instructions.addRow({ field: "Roles actuales", instruction: roles.map((role) => role.name).join(", ") || "Sin roles registrados" });
+    instructions.addRow({ field: "Roles actuales", instruction: formatQuotedOptions(roles.map((role) => role.name), "Sin roles registrados") });
     await workbook.xlsx.writeFile(destinationPath);
     return destinationPath;
   }

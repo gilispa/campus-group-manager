@@ -12,7 +12,7 @@ import type {
   StudentExportColumn
 } from "../types/domain";
 import { AuthenticationError } from "../utils/errors";
-import { readImportWorkbook, writeImportTemplate } from "../services/import-template.service";
+import { formatQuotedOptions, readImportWorkbook, writeImportTemplate } from "../services/import-template.service";
 
 type Handler<K extends IpcChannel> = (input: IpcChannelMap[K]["input"], event: IpcMainInvokeEvent) => Promise<IpcChannelMap[K]["output"]>;
 
@@ -230,12 +230,12 @@ export function registerIpcHandlers(): void {
       return writeImportTemplate(result.filePath, studentImportHeaders, [
         { field: "Nombre", instruction: "Obligatorio. Nombre completo del estudiante." },
         { field: "Matricula", instruction: "Obligatoria. Debe ser unica." },
-        { field: "Nivel", instruction: "Copia una opcion exacta: PREPA o PROFESIONAL." },
-        { field: "Carrera", instruction: `Obligatoria para PROFESIONAL. Opciones actuales: ${careers.map((item) => item.name).join(", ") || "Sin carreras registradas"}` },
-        { field: "Programa prepa", instruction: `Obligatorio para PREPA. Opciones actuales: ${programs.map((item) => item.name).join(", ") || "Sin programas registrados"}` },
+        { field: "Nivel", instruction: 'Copia una opcion exacta: "PREPA", "PROFESIONAL".' },
+        { field: "Carrera", instruction: `Obligatoria para PROFESIONAL. Opciones actuales: ${formatQuotedOptions(careers.map((item) => item.name), "Sin carreras registradas")}` },
+        { field: "Programa prepa", instruction: `Obligatorio para PREPA. Opciones actuales: ${formatQuotedOptions(programs.map((item) => item.name), "Sin programas registrados")}` },
         { field: "Generacion", instruction: "Obligatoria. Numero entero positivo, por ejemplo 2026." },
         { field: "Email / Telefono / Notas", instruction: "Opcionales. Deja vacio si no aplica." },
-        { field: "Activo", instruction: "Opcional. Copia Si o No; si se deja vacio se toma como Si." },
+        { field: "Activo", instruction: 'Opcional. Copia "Si" o "No"; si se deja vacio se toma como "Si".' },
         { field: "Ejemplo", instruction: `Nombre: Ana Lopez | Matricula: A01234567 | Nivel: PROFESIONAL | Carrera: ${careers[0]?.name ?? "Carrera"} | Generacion: 2026 | Activo: Si` }
       ]);
     },
@@ -345,8 +345,8 @@ export function registerIpcHandlers(): void {
       const [giros, portfolios] = await Promise.all([services.giroService.listCategories(), services.portfolioService.listPortfolios()]);
       return writeImportTemplate(result.filePath, groupImportHeaders, [
         { field: "Nombre", instruction: "Obligatorio. Nombre del grupo." },
-        { field: "Giro", instruction: `Obligatorio. Copia una opcion exacta: ${giros.map((item) => item.name).join(", ") || "Sin giros registrados"}` },
-        { field: "Portafolio", instruction: `Obligatorio. Copia una opcion exacta: ${portfolios.map((item) => item.name).join(", ") || "Sin portafolios registrados"}` },
+        { field: "Giro", instruction: `Obligatorio. Copia una opcion exacta: ${formatQuotedOptions(giros.map((item) => item.name), "Sin giros registrados")}` },
+        { field: "Portafolio", instruction: `Obligatorio. Copia una opcion exacta: ${formatQuotedOptions(portfolios.map((item) => item.name), "Sin portafolios registrados")}` },
         { field: "Descripcion", instruction: "Opcional. Descripcion del grupo." },
         { field: "Ejemplo", instruction: `Nombre: Grupo ejemplo | Giro: ${giros[0]?.name ?? "Giro"} | Portafolio: ${portfolios[0]?.name ?? "Portafolio"}` }
       ]);
@@ -433,10 +433,10 @@ export function registerIpcHandlers(): void {
       const [groups, roles] = await Promise.all([services.groupService.listGroups(), services.roleService.listRoles()]);
       return writeImportTemplate(result.filePath, membershipImportHeaders, [
         { field: "Matricula", instruction: "Obligatoria. Debe coincidir con un estudiante existente." },
-        { field: "Grupo", instruction: `Obligatorio. Copia una opcion exacta: ${groups.map((item) => item.nombre).join(", ") || "Sin grupos registrados"}` },
-        { field: "Rol", instruction: `Opcional. Copia una opcion exacta: ${roles.map((item) => item.name).join(", ") || "Sin roles registrados"}` },
+        { field: "Grupo", instruction: `Obligatorio. Copia una opcion exacta: ${formatQuotedOptions(groups.map((item) => item.nombre), "Sin grupos registrados")}` },
+        { field: "Rol", instruction: `Opcional. Copia una opcion exacta: ${formatQuotedOptions(roles.map((item) => item.name), "Sin roles registrados")}` },
         { field: "FechaIngreso / FechaSalida", instruction: "Opcionales. Usa una fecha reconocible, preferentemente AAAA-MM-DD." },
-        { field: "Activo", instruction: "Opcional. Copia Si o No; si se deja vacio se toma como vigente." },
+        { field: "Activo", instruction: 'Opcional. Copia "Si" o "No"; si se deja vacio se toma como vigente.' },
         { field: "Ejemplo", instruction: `Matricula: A01234567 | Grupo: ${groups[0]?.nombre ?? "Grupo"} | Rol: ${roles[0]?.name ?? "Rol"} | Activo: Si` }
       ]);
     },

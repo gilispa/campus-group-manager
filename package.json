@@ -1,6 +1,6 @@
 {
   "name": "base-de-datos-grupos",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "Backend local-first para gestion de grupos estudiantiles con Electron, Prisma y SQLite",
   "main": "dist/electron/main.js",
@@ -16,12 +16,11 @@
     "start:desktop": "npm run build && npx electron .",
     "dist:win": "npm run build && electron-builder --win nsis",
     "dist:dir": "npm run build && electron-builder --dir",
-    "examples": "tsx src/main/examples.ts",
-    "test": "tsx --test tests/**/*.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "docs:pdf": "node scripts/generate-user-guide-pdf.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.8.2",
@@ -42,7 +41,6 @@
     "concurrently": "^9.1.2",
     "electron": "^35.5.1",
     "electron-builder": "^24.13.3",
-    "tsx": "^4.19.4",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
     "wait-on": "^8.0.3"

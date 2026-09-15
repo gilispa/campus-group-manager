@@ -2,6 +2,11 @@ node_modules/
 dist/
 .env
 release/
+release-*/
+install-test-*/
+dashboard-screenshots/
+dist/
+desktop
 data/uploads/
 data/test-runs/
 data/database/*.db

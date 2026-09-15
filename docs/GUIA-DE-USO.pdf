@@ -1,0 +1,782 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R 11 0 R 13 0 R] /Count 5 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 2923 >>
+stream
+BT
+/F1 18 Tf
+72 760 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 14 Tf
+72 724 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 14 Tf
+72 676 Td
+(1. Que es GE Finder) Tj
+ET
+BT
+/F1 10 Tf
+72 628 Td
+(GE Finder es una aplicacion de escritorio para organizar grupos estudiantiles. Permite) Tj
+ET
+BT
+/F1 10 Tf
+72 614 Td
+(registrar estudiantes y grupos, administrar sus pertenencias y roles, conservar el) Tj
+ET
+BT
+/F1 10 Tf
+72 600 Td
+(historial, realizar cambios de gestion, generar reportes y proteger la informacion con) Tj
+ET
+BT
+/F1 10 Tf
+72 586 Td
+(respaldos locales.) Tj
+ET
+BT
+/F1 10 Tf
+72 558 Td
+(La informacion se guarda en la computadora donde esta instalada la aplicacion. Por ello es) Tj
+ET
+BT
+/F1 10 Tf
+72 544 Td
+(importante crear respaldos periodicamente y resguardar el acceso a la computadora.) Tj
+ET
+BT
+/F1 14 Tf
+72 516 Td
+(2. Instalacion e inicio de sesion) Tj
+ET
+BT
+/F1 10 Tf
+72 468 Td
+(1. Abre el instalador de GE Finder y sigue las indicaciones de Windows.) Tj
+ET
+BT
+/F1 10 Tf
+72 454 Td
+(2. Abre GE Finder desde el acceso directo del escritorio o el menu Inicio.) Tj
+ET
+BT
+/F1 10 Tf
+72 440 Td
+(3. En el primer uso, define la contrasena del administrador. En los accesos posteriores,) Tj
+ET
+BT
+/F1 10 Tf
+72 426 Td
+(escribe esa contrasena para iniciar sesion.) Tj
+ET
+BT
+/F1 10 Tf
+72 412 Td
+(4. Para cambiar una contrasena conocida, entra a Cuenta y selecciona Cambiar contrasena.) Tj
+ET
+BT
+/F1 10 Tf
+72 384 Td
+(Importante: al importar un respaldo de base de datos, GE Finder reemplaza los datos actuales) Tj
+ET
+BT
+/F1 10 Tf
+72 370 Td
+(por los del respaldo. La contrasena tambien pasa a ser la que estaba configurada en la base) Tj
+ET
+BT
+/F1 10 Tf
+72 356 Td
+(de datos importada.) Tj
+ET
+BT
+/F1 14 Tf
+72 328 Td
+(3. Orden recomendado para comenzar una base nueva) Tj
+ET
+BT
+/F1 10 Tf
+72 280 Td
+(1. Ve a Catalogos y registra primero los giros, portafolios, roles, carreras y programas de) Tj
+ET
+BT
+/F1 10 Tf
+72 266 Td
+(prepa que vas a utilizar.) Tj
+ET
+BT
+/F1 10 Tf
+72 252 Td
+(2. Crea los estudiantes desde Estudiantes o usa la plantilla masiva de estudiantes.) Tj
+ET
+BT
+/F1 10 Tf
+72 238 Td
+(3. Crea los grupos desde Grupos o usa la plantilla masiva de grupos.) Tj
+ET
+BT
+/F1 10 Tf
+72 224 Td
+(4. Asigna estudiantes a los grupos y define sus roles mediante las pertenencias.) Tj
+ET
+BT
+/F1 10 Tf
+72 196 Td
+(Las importaciones masivas de estudiantes, grupos y pertenencias son especialmente utiles) Tj
+ET
+BT
+/F1 10 Tf
+72 182 Td
+(para cargar una base de datos por primera vez. Para los cambios de semestre o de mesa) Tj
+ET
+BT
+/F1 10 Tf
+72 168 Td
+(directiva, el flujo planeado es Cambio de gestion, no volver a importar toda la base.) Tj
+ET
+BT
+/F1 14 Tf
+72 140 Td
+(4. Dashboard y Catalogos) Tj
+ET
+BT
+/F1 10 Tf
+72 92 Td
+(El Dashboard resume los estudiantes, grupos y pertenencias vigentes. Muestra indicadores) Tj
+ET
+BT
+/F1 10 Tf
+72 78 Td
+(generales y separados entre Prepa y Profesional. Tambien permite identificar cuantos alumnos) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 3501 >>
+stream
+BT
+/F1 18 Tf
+72 760 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 10 Tf
+72 724 Td
+(estan pendientes por agregar despues de un cambio de gestion. Usa Recargar si acabas de) Tj
+ET
+BT
+/F1 10 Tf
+72 710 Td
+(hacer un cambio y quieres actualizar los indicadores.) Tj
+ET
+BT
+/F1 10 Tf
+72 682 Td
+(En Catalogos se administran los valores que se usan en el resto de la aplicacion: Giros,) Tj
+ET
+BT
+/F1 10 Tf
+72 668 Td
+(Portafolios, Roles, Carreras y Programas. Crea estos elementos antes de capturar estudiantes) Tj
+ET
+BT
+/F1 10 Tf
+72 654 Td
+(o grupos para que aparezcan como opciones disponibles. Los catalogos actuales tambien) Tj
+ET
+BT
+/F1 10 Tf
+72 640 Td
+(aparecen en las instrucciones de las plantillas de Excel.) Tj
+ET
+BT
+/F1 10 Tf
+72 612 Td
+(Puedes buscar, editar o eliminar elementos. Lo eliminado llega a la Papelera, en Cuenta,) Tj
+ET
+BT
+/F1 10 Tf
+72 598 Td
+(desde donde se puede restaurar o eliminar permanentemente.) Tj
+ET
+BT
+/F1 14 Tf
+72 570 Td
+(5. Estudiantes y graduacion) Tj
+ET
+BT
+/F1 10 Tf
+72 522 Td
+(En Estudiantes puedes crear, buscar, editar, eliminar o graduar alumnos. Al dar de alta, la) Tj
+ET
+BT
+/F1 10 Tf
+72 508 Td
+(matricula debe ser unica. Para Profesional se asigna una carrera; para Prepa se asigna un) Tj
+ET
+BT
+/F1 10 Tf
+72 494 Td
+(programa. Tambien se puede agregar foto, correo, telefono, notas y pertenencias iniciales.) Tj
+ET
+BT
+/F1 10 Tf
+72 466 Td
+(Desde la ficha de un estudiante se consultan sus grupos vigentes y su historial de) Tj
+ET
+BT
+/F1 10 Tf
+72 452 Td
+(participacion. Una pertenencia indica la relacion entre un alumno y un grupo; puede tener un) Tj
+ET
+BT
+/F1 10 Tf
+72 438 Td
+(rol, fecha de ingreso, fecha de salida y estado. Si esta vigente, el alumno es miembro) Tj
+ET
+BT
+/F1 10 Tf
+72 424 Td
+(actual del grupo; si es historica, conserva el registro de una participacion anterior.) Tj
+ET
+BT
+/F1 10 Tf
+72 396 Td
+(Usa los filtros por nombre, matricula, generacion, nivel, carrera, programa, rol y estado) Tj
+ET
+BT
+/F1 10 Tf
+72 382 Td
+(para encontrar alumnos rapidamente.) Tj
+ET
+BT
+/F1 10 Tf
+72 354 Td
+(Para graduar, en Estudiantes presiona Graduar alumnos. Selecciona el nivel, busca y marca a) Tj
+ET
+BT
+/F1 10 Tf
+72 340 Td
+(los alumnos que corresponda. Para Profesional, el proceso los deja inactivos y desactiva sus) Tj
+ET
+BT
+/F1 10 Tf
+72 326 Td
+(pertenencias vigentes. Para Prepa, permite decidir quienes continuan; los que continuan) Tj
+ET
+BT
+/F1 10 Tf
+72 312 Td
+(pasan a Profesional y quedan pendientes de asignar una carrera, mientras que los demas se) Tj
+ET
+BT
+/F1 10 Tf
+72 298 Td
+(graduan. Revisa con cuidado la lista antes de confirmar. Este proceso actualiza el estado) Tj
+ET
+BT
+/F1 10 Tf
+72 284 Td
+(academico; no sustituye el Cambio de gestion de cada grupo.) Tj
+ET
+BT
+/F1 14 Tf
+72 256 Td
+(6. Grupos y pertenencias) Tj
+ET
+BT
+/F1 10 Tf
+72 208 Td
+(En Grupos puedes crear, buscar, editar y eliminar grupos, agregar logo, giro, portafolio y) Tj
+ET
+BT
+/F1 10 Tf
+72 194 Td
+(descripcion. Abre un grupo para ver sus integrantes actuales, modificar sus roles y) Tj
+ET
+BT
+/F1 10 Tf
+72 180 Td
+(consultar su historial.) Tj
+ET
+BT
+/F1 10 Tf
+72 152 Td
+(Una pertenencia es el registro que une a un estudiante con un grupo. Por ejemplo: Ana Lopez) Tj
+ET
+BT
+/F1 10 Tf
+72 138 Td
+(pertenece al grupo Robotica con el rol de Presidenta. Las pertenencias pueden estar vigentes) Tj
+ET
+BT
+/F1 10 Tf
+72 124 Td
+(o historicas. El historial evita perder la informacion de participaciones anteriores cuando) Tj
+ET
+BT
+/F1 10 Tf
+72 110 Td
+(un alumno sale de un grupo o cambia la gestion.) Tj
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 3445 >>
+stream
+BT
+/F1 18 Tf
+72 760 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 14 Tf
+72 724 Td
+(7. Cambio de gestion) Tj
+ET
+BT
+/F1 10 Tf
+72 676 Td
+(El Cambio de gestion se usa cuando cambia la mesa, equipo o integrantes que administran un) Tj
+ET
+BT
+/F1 10 Tf
+72 662 Td
+(grupo. Entra al detalle del grupo y busca la seccion Cambio de gestion.) Tj
+ET
+BT
+/F1 10 Tf
+72 634 Td
+(1. Descarga la plantilla Excel del grupo.) Tj
+ET
+BT
+/F1 10 Tf
+72 620 Td
+(2. En la hoja Plantilla captura Matricula, Nombre opcional y Rol. Las instrucciones muestran) Tj
+ET
+BT
+/F1 10 Tf
+72 606 Td
+(los roles validos; cada opcion aparece entre comillas para que sea facil copiar valores) Tj
+ET
+BT
+/F1 10 Tf
+72 592 Td
+(compuestos por varias palabras.) Tj
+ET
+BT
+/F1 10 Tf
+72 578 Td
+(3. Selecciona el archivo y usa Previsualizar. Corrige cualquier fila con error antes de) Tj
+ET
+BT
+/F1 10 Tf
+72 564 Td
+(continuar.) Tj
+ET
+BT
+/F1 10 Tf
+72 550 Td
+(4. Presiona Aplicar cambio de gestion solo cuando la previsualizacion sea correcta.) Tj
+ET
+BT
+/F1 10 Tf
+72 522 Td
+(Al aplicar el cambio, todas las pertenencias vigentes actuales del grupo pasan a ser) Tj
+ET
+BT
+/F1 10 Tf
+72 508 Td
+(historicas y se crean las nuevas pertenencias vigentes para la gestion entrante. Por eso no) Tj
+ET
+BT
+/F1 10 Tf
+72 494 Td
+(se debe usar para un ajuste menor de un solo integrante; para eso edita las pertenencias del) Tj
+ET
+BT
+/F1 10 Tf
+72 480 Td
+(grupo o del estudiante.) Tj
+ET
+BT
+/F1 10 Tf
+72 452 Td
+(La plantilla permite incluir alumnos que todavia no existen en la base. Esas filas no se) Tj
+ET
+BT
+/F1 10 Tf
+72 438 Td
+(pierden: se registran como Pendientes por agregar junto con el grupo y rol indicados. Puedes) Tj
+ET
+BT
+/F1 10 Tf
+72 424 Td
+(abrirlos desde el boton Pendientes por agregar en Estudiantes, desde el indicador del) Tj
+ET
+BT
+/F1 10 Tf
+72 410 Td
+(Dashboard o desde la seccion Alumnos pendientes dentro del grupo. Cuando registres al alumno) Tj
+ET
+BT
+/F1 10 Tf
+72 396 Td
+(con la misma matricula, GE Finder vincula automaticamente su pertenencia pendiente.) Tj
+ET
+BT
+/F1 14 Tf
+72 368 Td
+(8. Plantillas e importacion masiva) Tj
+ET
+BT
+/F1 10 Tf
+72 320 Td
+(En Respaldos puedes descargar plantillas e importar estudiantes, grupos y pertenencias desde) Tj
+ET
+BT
+/F1 10 Tf
+72 306 Td
+(Excel \(.xlsx\) o CSV. Cada plantilla incluye una hoja Plantilla para capturar datos y una) Tj
+ET
+BT
+/F1 10 Tf
+72 292 Td
+(hoja Instrucciones. Las opciones se actualizan cada vez que se descarga la plantilla y se) Tj
+ET
+BT
+/F1 10 Tf
+72 278 Td
+(presentan separadas por comillas.) Tj
+ET
+BT
+/F1 10 Tf
+72 250 Td
+(Antes de importar estudiantes, crea sus carreras o programas. Antes de importar grupos, crea) Tj
+ET
+BT
+/F1 10 Tf
+72 236 Td
+(sus giros y portafolios. Antes de importar pertenencias, deben existir estudiantes, grupos y) Tj
+ET
+BT
+/F1 10 Tf
+72 222 Td
+(roles. Despues de importar, revisa el aviso que indica cuantas filas se crearon y cuales) Tj
+ET
+BT
+/F1 10 Tf
+72 208 Td
+(tuvieron error; corrige solamente las filas fallidas.) Tj
+ET
+BT
+/F1 14 Tf
+72 180 Td
+(9. Exportar informacion para Excel) Tj
+ET
+BT
+/F1 10 Tf
+72 132 Td
+(Para exportar estudiantes o grupos, entra a Estudiantes o Grupos y presiona Exportar CSV. El) Tj
+ET
+BT
+/F1 10 Tf
+72 118 Td
+(archivo CSV se abre directamente con Excel. En la ventana de exportacion puedes elegir que) Tj
+ET
+BT
+/F1 10 Tf
+72 104 Td
+(columnas o casillas incluir, por ejemplo nombre, matricula, nivel, carrera, grupos activos,) Tj
+ET
+BT
+/F1 10 Tf
+72 90 Td
+(roles, fechas y conteos.) Tj
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+10 0 obj
+<< /Length 3768 >>
+stream
+BT
+/F1 18 Tf
+72 760 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 10 Tf
+72 710 Td
+(Tambien puedes aplicar filtros antes de exportar: alumnos o grupos concretos, nivel,) Tj
+ET
+BT
+/F1 10 Tf
+72 696 Td
+(generacion, carrera, programa, giro, portafolio, rol, activos/inactivos y pertenencias) Tj
+ET
+BT
+/F1 10 Tf
+72 682 Td
+(vigentes o todo el historial. Selecciona las casillas de lo que quieras exportar y presiona) Tj
+ET
+BT
+/F1 10 Tf
+72 668 Td
+(Exportar CSV. Para exportar pertenencias, abre la misma ventana y elige la pestaÒa) Tj
+ET
+BT
+/F1 10 Tf
+72 654 Td
+(Pertenencias; alli puedes incluir las vigentes o el historial completo.) Tj
+ET
+BT
+/F1 10 Tf
+72 626 Td
+(Los reportes permiten obtener, entre otros, pertenencias completas, estudiantes sin grupo) Tj
+ET
+BT
+/F1 10 Tf
+72 612 Td
+(vigente, grupos sin lider, grupos con pocos integrantes e inconsistencias entre alumnos) Tj
+ET
+BT
+/F1 10 Tf
+72 598 Td
+(inactivos y pertenencias vigentes.) Tj
+ET
+BT
+/F1 14 Tf
+72 570 Td
+(10. Respaldos de la base de datos) Tj
+ET
+BT
+/F1 10 Tf
+72 522 Td
+(En Respaldos, usa Exportar respaldo para crear un archivo .zip. Es el formato recomendado) Tj
+ET
+BT
+/F1 10 Tf
+72 508 Td
+(porque incluye la base de datos y las fotos/logos. Guarda una copia fuera de la computadora) Tj
+ET
+BT
+/F1 10 Tf
+72 494 Td
+(principal. El formato .db existe para respaldos antiguos, pero no incluye imagenes.) Tj
+ET
+BT
+/F1 10 Tf
+72 466 Td
+(Para restaurar, usa Importar respaldo y selecciona un .zip o .db valido. Esta accion) Tj
+ET
+BT
+/F1 10 Tf
+72 452 Td
+(reemplaza los datos actuales, imagenes incluidas cuando se usa .zip, y tambien reemplaza la) Tj
+ET
+BT
+/F1 10 Tf
+72 438 Td
+(contrasena por la almacenada en la base importada. Antes de importar, exporta un respaldo) Tj
+ET
+BT
+/F1 10 Tf
+72 424 Td
+(nuevo por seguridad.) Tj
+ET
+BT
+/F1 14 Tf
+72 396 Td
+(11. Problemas frecuentes y que hacer) Tj
+ET
+BT
+/F1 10 Tf
+72 348 Td
+(- No puedo iniciar sesion despues de importar una base: usa la contrasena que tenia esa base) Tj
+ET
+BT
+/F1 10 Tf
+72 334 Td
+(de datos antes de ser exportada.) Tj
+ET
+BT
+/F1 10 Tf
+72 320 Td
+(- Una opcion no aparece en la plantilla: crea o restaura el giro, portafolio, rol, carrera o) Tj
+ET
+BT
+/F1 10 Tf
+72 306 Td
+(programa en Catalogos y descarga una plantilla nueva.) Tj
+ET
+BT
+/F1 10 Tf
+72 292 Td
+(- Una fila de importacion falla porque no existe un valor: copia exactamente la opcion) Tj
+ET
+BT
+/F1 10 Tf
+72 278 Td
+(mostrada en Instrucciones y verifica que el catalogo exista.) Tj
+ET
+BT
+/F1 10 Tf
+72 264 Td
+(- La matricula ya existe: no crees un duplicado; busca al estudiante y editalo.) Tj
+ET
+BT
+/F1 10 Tf
+72 250 Td
+(- Un alumno no aparece como integrante: revisa si su pertenencia esta historica, si el grupo) Tj
+ET
+BT
+/F1 10 Tf
+72 236 Td
+(fue eliminado o si el alumno esta inactivo.) Tj
+ET
+BT
+/F1 10 Tf
+72 222 Td
+(- Hay alumnos pendientes despues de un cambio de gestion: registralos con la misma matricula) Tj
+ET
+BT
+/F1 10 Tf
+72 208 Td
+(desde Estudiantes; la pertenencia se resolvera automaticamente. Si no deben agregarse,) Tj
+ET
+BT
+/F1 10 Tf
+72 194 Td
+(cancelalos desde Pendientes por agregar.) Tj
+ET
+BT
+/F1 10 Tf
+72 180 Td
+(- No encuentro algo que elimine: entra a Cuenta > Papelera para restaurarlo. La eliminacion) Tj
+ET
+BT
+/F1 10 Tf
+72 166 Td
+(permanente no se puede deshacer.) Tj
+ET
+BT
+/F1 10 Tf
+72 152 Td
+(- Faltan fotos o logos tras restaurar: usa un respaldo .zip, no un .db, porque el .zip) Tj
+ET
+BT
+/F1 10 Tf
+72 138 Td
+(incluye imagenes.) Tj
+ET
+BT
+/F1 10 Tf
+72 124 Td
+(- Excel muestra los datos en una sola columna: abre el archivo CSV con Excel y usa la) Tj
+ET
+BT
+/F1 10 Tf
+72 110 Td
+(importacion de texto/CSV, seleccionando coma como separador si es necesario.) Tj
+ET
+BT
+/F1 10 Tf
+72 96 Td
+(- El cambio de gestion muestra errores: no lo apliques. Corrige las filas indicadas en la) Tj
+ET
+endstream
+endobj
+11 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 10 0 R >>
+endobj
+12 0 obj
+<< /Length 673 >>
+stream
+BT
+/F1 18 Tf
+72 760 Td
+(Guia de uso - GE Finder) Tj
+ET
+BT
+/F1 10 Tf
+72 724 Td
+(plantilla y vuelve a previsualizar.) Tj
+ET
+BT
+/F1 14 Tf
+72 696 Td
+(12. Recomendaciones de operacion) Tj
+ET
+BT
+/F1 10 Tf
+72 648 Td
+(- Exporta un respaldo antes de graduaciones, cambios de gestion o importaciones grandes.) Tj
+ET
+BT
+/F1 10 Tf
+72 634 Td
+(- Usa Cambio de gestion solo al renovar el equipo completo de un grupo.) Tj
+ET
+BT
+/F1 10 Tf
+72 620 Td
+(- Manten actualizados los Catalogos; las plantillas dependen de ellos.) Tj
+ET
+BT
+/F1 10 Tf
+72 606 Td
+(- Revisa siempre las previsualizaciones y los mensajes de error antes de confirmar acciones) Tj
+ET
+BT
+/F1 10 Tf
+72 592 Td
+(masivas.) Tj
+ET
+endstream
+endobj
+13 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 12 0 R >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000147 00000 n 
+0000000217 00000 n 
+0000003192 00000 n 
+0000003318 00000 n 
+0000006871 00000 n 
+0000006997 00000 n 
+0000010494 00000 n 
+0000010620 00000 n 
+0000014441 00000 n 
+0000014569 00000 n 
+0000015294 00000 n 
+trailer
+<< /Size 14 /Root 1 0 R >>
+startxref
+15422
+%%EOF

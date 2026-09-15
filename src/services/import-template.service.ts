@@ -3,6 +3,17 @@ import ExcelJS from "exceljs";
 export type InstructionRow = { field: string; instruction: string };
 export type ImportRow = Record<string, string> & { __sourceRow?: string };
 
+/**
+ * Makes each catalog value visually unambiguous in the Excel instructions.
+ * This is especially useful for values made up of more than one word, since a
+ * person can copy the complete value between the quotation marks.
+ */
+export function formatQuotedOptions(options: string[], emptyMessage: string): string {
+  return options.length > 0
+    ? options.map((option) => `"${option}"`).join(", ")
+    : emptyMessage;
+}
+
 export async function writeImportTemplate(
   destinationPath: string,
   headers: string[],
